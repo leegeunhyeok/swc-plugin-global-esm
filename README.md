@@ -104,107 +104,113 @@ global.__modules.export("<module-file-name>", {
 });
 ```
 
-## Usage
+## Use Cases
 
-### Esbuild
+<details>
 
-```ts
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import * as esbuild from 'esbuild';
-import { transform } from '@swc/core';
+  <summary>esbuild</summary>
 
-// Source root
-const ROOT = path.resolve('.');
+  ```ts
+  import fs from 'node:fs/promises';
+  import path from 'node:path';
+  import * as esbuild from 'esbuild';
+  import { transform } from '@swc/core';
 
-const context = await esbuild.context({
-  // ...,
-  sourceRoot: ROOT,
-  metafile: true,
-  inject: ['swc-plugin-global-esm/runtime'],
-  plugins: [
+  const ROOT = path.resolve('.');
+
+  const context = await esbuild.context({
     // ...,
-    {
-      name: 'store-metadata-plugin',
-      setup(build) {
-        build.onEnd((result) => {
-          // eg. store metadata to memory for read it later.
-          store.set('metafile', result.metafile);
-        });
+    sourceRoot: ROOT,
+    metafile: true,
+    inject: ['swc-plugin-global-esm/runtime'],
+    plugins: [
+      // ...,
+      {
+        name: 'store-metadata-plugin',
+        setup(build) {
+          build.onEnd((result) => {
+            /**
+             * Store metafile data to memory for read it later.
+             * 
+             * # Metafile
+             *
+             * ```js
+             * {
+             *   inputs: {
+             *     'src/index.ts': {
+             *       bytes: 100,
+             *       imports: [
+             *         {
+             *           kind: '...',
+             *           // Import path in source code
+             *           original: 'react',
+             *           // Resolved path by esbuild (actual module path)
+             *           path: 'node_modules/react/cjs/react.development.js',
+             *           external: false,
+             *         },
+             *         ...
+             *       ],
+             *     },
+             *     ...
+             *   },
+             *   outputs: {...}
+             * }
+             * ```
+             */
+            store.set('metafile', result.metafile);
+          });
+        },
       },
-    },
-  ],
-});
-await context.rebuild();
-
-// eg. file system watcher
-watcher.addEventListener(async ({ path }) => {
-  /**
-   * Get import paths from esbuild's metafile data.
-   *
-   * # Metafile sample
-   *
-   *
-   * ```
-   * {
-   *   inputs: {
-   *     'src/index.ts': {
-   *       bytes: 100,
-   *       imports: [
-   *         {
-   *           kind: '...',
-   *           original: 'react',
-   *           path: 'node_modules/react/cjs/react.development.js',
-   *           external: false,
-   *         },
-   *         ...
-   *       ],
-   *     },
-   *     ...
-   *   },
-   *   outputs: {...}
-   * }
-   * ```
-   *
-   * # Return sample
-   *
-   * ```
-   * {
-   *   'react': 'node_modules/react/cjs/react.development.js',
-   *   'src/components/Button': 'src/components/Button.tsx',
-   *   ...
-   * }
-   * ```
-   */
-  const getImportPathsFromMetafile = (path: string) => {
-    const metafile = store.get('metafile');
-    return metafile?.inputs[strippedPath]?.imports?.reduce((prev, curr) => ({
-      ...prev,
-      [curr.original]: curr.path
-    }), {}) ?? {};
-  };
-
-  const strippedPath = path.replace(ROOT, '').substring(1);
-  const rawCode = await fs.readFile(path, 'utf-8');
-  const transformedCode = await transform(rawCode, {
-    filename: strippedPath,
-    jsc: {
-      experimental: {
-        plugins: [
-          ['swc-plugin-global-esm', {
-            runtimeModule: true,
-            importPaths: getImportPathsFromMetafile(strippedPath),
-          }],
-        ],
-      },
-      externalHelpers: false,
-    },
+    ],
   });
-  
-  // eg. send HMR update message to clients via websocket.
-  sendHMRUpdateMessage(path, transformedCode);
-});
-```
+  await context.rebuild();
+
+  // eg. file system watcher
+  watcher.addEventListener(async ({ path }) => {
+    /**
+     * Get import paths from esbuild's metafile data.
+     *
+     * # Return value
+     *
+     * ```js
+     * {
+     *   'react': 'node_modules/react/cjs/react.development.js',
+     *   'src/components/Button': 'src/components/Button.tsx',
+     *   ...
+     * }
+     * ```
+     */
+    const getImportPathsFromMetafile = (filepath: string) => {
+      const metafile = store.get('metafile');
+      return metafile?.inputs[filepath]?.imports?.reduce((prev, curr) => ({
+        ...prev,
+        [curr.original]: curr.path
+      }), {}) ?? {};
+    };
+
+    const strippedPath = path.replace(ROOT, '').substring(1);
+    const rawCode = await fs.readFile(path, 'utf-8');
+    const transformedCode = await transform(rawCode, {
+      filename: strippedPath,
+      jsc: {
+        experimental: {
+          plugins: [
+            ['swc-plugin-global-esm', {
+              runtimeModule: true,
+              importPaths: getImportPathsFromMetafile(strippedPath),
+            }],
+          ],
+        },
+        externalHelpers: false,
+      },
+    });
+    
+    // eg. send HMR update message to clients via websocket.
+    sendHMRUpdateMessage(path, transformedCode);
+  });
+  ```
+
+</details>
 
 ## License
 
