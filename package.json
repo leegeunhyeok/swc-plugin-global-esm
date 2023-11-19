@@ -11,6 +11,7 @@
     ],
     "main": "target/wasm32-wasi/release/swc_plugin_global_esm.wasm",
     "scripts": {
+        "test": "cargo test",
         "build": "cargo build-wasi",
         "prepublishOnly": "yarn build --release"
     },
@@ -20,11 +21,11 @@
         "target/wasm32-wasi/release/swc_plugin_global_esm.wasm"
     ],
     "repository": {
-      "type": "git",
-      "url": "git+https://github.com/leegeunhyeok/swc-plugin-global-esm.git"
+        "type": "git",
+        "url": "git+https://github.com/leegeunhyeok/swc-plugin-global-esm.git"
     },
     "bugs": {
-      "url": "https://github.com/leegeunhyeok/swc-plugin-global-esm/issues"
+        "url": "https://github.com/leegeunhyeok/swc-plugin-global-esm/issues"
     },
     "preferUnplugged": true
 }

@@ -1,48 +1,234 @@
-use swc_core::ecma::{
-    ast::Program,
-    transforms::testing::test,
-    visit::{as_folder, FoldWith, VisitMut},
-};
+mod module_collector;
+mod utils;
+
+use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
+use serde::Deserialize;
+use swc_core::common::Span;
 use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
+use swc_core::{
+    atoms::js_word,
+    common::DUMMY_SP,
+    ecma::{
+        ast::*,
+        visit::{as_folder, noop_visit_mut_type, FoldWith, VisitMut, VisitMutWith},
+    },
+    plugin::metadata::TransformPluginMetadataContextKind,
+};
+use utils::{
+    call_expr, decl_var_and_assign_stmt, fn_arg, ident, ident_expr, obj_member_expr, str_lit_expr,
+};
 
-pub struct TransformVisitor;
+const GLOBAL: &str = "global";
+const MODULE: &str = "__modules";
+const MODULE_IMPORT_METHOD_NAME: &str = "import";
+const MODULE_EXPORT_METHOD_NAME: &str = "export";
 
-impl VisitMut for TransformVisitor {
-    // Implement necessary visit_mut_* methods for actual custom transform.
-    // A comprehensive list of possible visitor methods can be found here:
-    // https://rustdoc.swc.rs/swc_ecma_visit/trait.VisitMut.html
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GlobalEsmModuleOptions {
+    runtime_module: Option<bool>,
 }
 
-/// An example plugin function with macro support.
-/// `plugin_transform` macro interop pointers into deserialized structs, as well
-/// as returning ptr back to host.
-///
-/// It is possible to opt out from macro by writing transform fn manually
-/// if plugin need to handle low-level ptr directly via
-/// `__transform_plugin_process_impl(
-///     ast_ptr: *const u8, ast_ptr_len: i32,
-///     unresolved_mark: u32, should_enable_comments_proxy: i32) ->
-///     i32 /*  0 for success, fail otherwise.
-///             Note this is only for internal pointer interop result,
-///             not actual transform result */`
-///
-/// This requires manual handling of serialization / deserialization from ptrs.
-/// Refer swc_plugin_macro to see how does it work internally.
+pub struct GlobalEsmModule {
+    module_name: String,
+    runtime_module: bool,
+}
+
+impl GlobalEsmModule {
+    fn get_custom_import_expr(&mut self, module_name: String) -> Expr {
+        call_expr(
+            obj_member_expr(
+                obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
+                Ident::new(js_word!(MODULE_IMPORT_METHOD_NAME), DUMMY_SP),
+            ),
+            vec![fn_arg(str_lit_expr(module_name))],
+        )
+    }
+
+    fn get_custom_export_expr(&mut self, export_expr: Expr) -> Expr {
+        call_expr(
+            obj_member_expr(
+                obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
+                Ident::new(js_word!(MODULE_EXPORT_METHOD_NAME), DUMMY_SP),
+            ),
+            vec![
+                fn_arg(str_lit_expr(self.module_name.to_owned())),
+                fn_arg(export_expr),
+            ],
+        )
+    }
+
+    fn default_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
+        decl_var_and_assign_stmt(
+            ident,
+            span,
+            obj_member_expr(
+                self.get_custom_import_expr(module_name),
+                Ident::new("default".into(), DUMMY_SP),
+            ),
+        )
+    }
+
+    fn named_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
+        decl_var_and_assign_stmt(
+            ident.clone(),
+            span,
+            obj_member_expr(
+                self.get_custom_import_expr(module_name),
+                Ident::new(ident.sym, DUMMY_SP),
+            ),
+        )
+    }
+
+    fn namespace_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
+        decl_var_and_assign_stmt(
+            ident.clone(),
+            span,
+            self.get_custom_import_expr(module_name),
+        )
+    }
+
+    fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
+        if exports.len() == 0 {
+            return Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
+        }
+
+        let mut export_props = Vec::new();
+        exports.into_iter().for_each(
+            |ExportModule {
+                 ident,
+                 as_ident,
+                 module_type,
+             }| {
+                if let Some(prop_ident) = as_ident.or(Some(ident.clone())) {
+                    export_props.push(match module_type {
+                        ModuleType::Default => {
+                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                key: PropName::Str(Str {
+                                    span: DUMMY_SP,
+                                    value: js_word!("default"),
+                                    raw: None,
+                                }),
+                                value: Box::new(Expr::Ident(ident)),
+                            })))
+                        }
+                        ModuleType::Named => {
+                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                                key: PropName::Str(Str {
+                                    span: DUMMY_SP,
+                                    value: prop_ident.sym,
+                                    raw: None,
+                                }),
+                                value: Box::new(Expr::Ident(ident)),
+                            })))
+                        }
+                        ModuleType::NamespaceOrAll => PropOrSpread::Spread(SpreadElement {
+                            dot3_token: DUMMY_SP,
+                            expr: Box::new(Expr::Ident(ident)),
+                        }),
+                    });
+                }
+            },
+        );
+
+        Expr::Object(ObjectLit {
+            span: DUMMY_SP,
+            props: export_props,
+        })
+    }
+
+    fn get_custom_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
+        let exports_obj = self.get_exports_obj_expr(exports);
+        Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: Box::new(self.get_custom_export_expr(exports_obj)),
+        })
+    }
+}
+
+impl VisitMut for GlobalEsmModule {
+    noop_visit_mut_type!();
+
+    fn visit_mut_module(&mut self, module: &mut Module) {
+        let mut collector = ModuleCollector::default(self.runtime_module);
+        module.visit_mut_with(&mut collector);
+
+        let ModuleCollector {
+            imports, exports, ..
+        } = collector;
+        let is_esm = imports.len() + exports.len() > 0;
+
+        // Imports
+        imports.into_iter().enumerate().for_each(
+            |(
+                index,
+                ImportModule {
+                    span,
+                    ident,
+                    module_src,
+                    module_type,
+                },
+            )| match module_type {
+                ModuleType::Default => {
+                    module.body.insert(
+                        index,
+                        self.default_import_stmt(module_src, span, ident).into(),
+                    );
+                }
+                ModuleType::Named => {
+                    module.body.insert(
+                        index,
+                        self.named_import_stmt(module_src, span, ident).into(),
+                    );
+                }
+                ModuleType::NamespaceOrAll => {
+                    module.body.insert(
+                        index,
+                        self.namespace_import_stmt(module_src, span, ident).into(),
+                    );
+                }
+            },
+        );
+
+        // Exports
+        if is_esm {
+            module
+                .body
+                .push(self.get_custom_exports_stmt(exports).into());
+        }
+    }
+}
+
 #[plugin_transform]
-pub fn process_transform(program: Program, _metadata: TransformPluginProgramMetadata) -> Program {
-    program.fold_with(&mut as_folder(TransformVisitor))
+pub fn react_native_esbuild_module_plugin(
+    program: Program,
+    metadata: TransformPluginProgramMetadata,
+) -> Program {
+    let config = serde_json::from_str::<GlobalEsmModuleOptions>(
+        &metadata
+            .get_transform_plugin_config()
+            .expect("failed to get plugin config for swc-plugin-react-native-esbuild-module"),
+    )
+    .expect("invalid config for swc-plugin-react-native-esbuild-module");
+
+    let filename = metadata
+        .get_context(&TransformPluginMetadataContextKind::Filename)
+        .unwrap_or_default();
+
+    program.fold_with(&mut as_folder(GlobalEsmModule {
+        module_name: filename,
+        runtime_module: config.runtime_module.unwrap_or(false),
+    }))
 }
 
-// An example to test plugin transform.
-// Recommended strategy to test plugin's transform is verify
-// the Visitor's behavior, instead of trying to run `process_transform` with mocks
-// unless explicitly required to do so.
-test!(
-    Default::default(),
-    |_| as_folder(TransformVisitor),
-    boo,
-    // Input codes
-    r#"console.log("transform");"#,
-    // Output codes after transformed with plugin
-    r#"console.log("transform");"#
-);
+#[cfg(test)]
+#[path = "./tests/esm_import.rs"]
+mod esm_import;
+
+#[cfg(test)]
+#[path = "./tests/esm_export.rs"]
+mod esm_export;
+
+#[cfg(test)]
+#[path = "./tests/bundle_time_module.rs"]
+mod bundle_time_module;
