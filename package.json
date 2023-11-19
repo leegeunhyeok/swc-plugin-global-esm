@@ -1,14 +1,30 @@
 {
     "name": "swc-plugin-global-esm",
     "version": "0.1.0",
-    "description": "",
-    "author": "",
-    "license": "ISC",
-    "keywords": ["swc-plugin"],
+    "description": "Transform ESM to global scoped module",
+    "author": "Geunhyeok LEE <dev.ghlee@gmail.com>",
+    "license": "MIT",
+    "keywords": [
+        "swc-plugin",
+        "esbuild",
+        "react-native"
+    ],
     "main": "target/wasm32-wasi/release/swc_plugin_global_esm.wasm",
     "scripts": {
-        "prepublishOnly": "cargo build-wasi --release"
+        "build": "cargo build-wasi",
+        "prepublishOnly": "yarn build --release"
     },
-    "files": [],
+    "files": [
+        ".gitignore",
+        "package.json",
+        "target/wasm32-wasi/release/swc_plugin_global_esm.wasm"
+    ],
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/leegeunhyeok/swc-plugin-global-esm.git"
+    },
+    "bugs": {
+      "url": "https://github.com/leegeunhyeok/swc-plugin-global-esm/issues"
+    },
     "preferUnplugged": true
 }
