@@ -3,16 +3,17 @@ mod utils;
 
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use serde::Deserialize;
-use swc_core::common::Span;
-use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata};
 use swc_core::{
     atoms::js_word,
-    common::DUMMY_SP,
+    common::{Span, DUMMY_SP},
     ecma::{
         ast::*,
         visit::{as_folder, noop_visit_mut_type, FoldWith, VisitMut, VisitMutWith},
     },
-    plugin::metadata::TransformPluginMetadataContextKind,
+    plugin::{
+        metadata::TransformPluginMetadataContextKind, plugin_transform,
+        proxies::TransformPluginProgramMetadata,
+    },
 };
 use utils::{
     call_expr, decl_var_and_assign_stmt, fn_arg, ident, ident_expr, obj_member_expr, str_lit_expr,
