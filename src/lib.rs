@@ -215,10 +215,7 @@ impl VisitMut for GlobalEsmModule {
 }
 
 #[plugin_transform]
-pub fn global_esm_plugin(
-    program: Program,
-    metadata: TransformPluginProgramMetadata,
-) -> Program {
+pub fn global_esm_plugin(program: Program, metadata: TransformPluginProgramMetadata) -> Program {
     let config = serde_json::from_str::<GlobalEsmModuleOptions>(
         &metadata
             .get_transform_plugin_config()

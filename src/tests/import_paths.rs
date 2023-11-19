@@ -9,7 +9,10 @@ use swc_core::ecma::{
 fn plugin(with_import_paths: bool) -> Folder<GlobalEsmModule> {
     let mut import_paths = HashMap::new();
     if with_import_paths {
-        import_paths.insert(String::from("react"), String::from("node_modules/react/cjs/react.development.js"));
+        import_paths.insert(
+            String::from("react"),
+            String::from("node_modules/react/cjs/react.development.js"),
+        );
     }
 
     as_folder(GlobalEsmModule {
