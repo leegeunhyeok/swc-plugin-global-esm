@@ -201,16 +201,16 @@ impl VisitMut for GlobalEsmModule {
 }
 
 #[plugin_transform]
-pub fn react_native_esbuild_module_plugin(
+pub fn global_esm_plugin(
     program: Program,
     metadata: TransformPluginProgramMetadata,
 ) -> Program {
     let config = serde_json::from_str::<GlobalEsmModuleOptions>(
         &metadata
             .get_transform_plugin_config()
-            .expect("failed to get plugin config for swc-plugin-react-native-esbuild-module"),
+            .expect("failed to get plugin config for swc-plugin-global-esm"),
     )
-    .expect("invalid config for swc-plugin-react-native-esbuild-module");
+    .expect("invalid config for swc-plugin-global-esm");
 
     let filename = metadata
         .get_context(&TransformPluginMetadataContextKind::Filename)
