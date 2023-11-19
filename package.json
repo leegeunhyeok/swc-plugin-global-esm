@@ -4,11 +4,7 @@
     "description": "Transform ESM to global scoped module",
     "author": "Geunhyeok LEE <dev.ghlee@gmail.com>",
     "license": "MIT",
-    "keywords": [
-        "swc-plugin",
-        "esbuild",
-        "react-native"
-    ],
+    "keywords": ["swc-plugin", "esm"],
     "main": "target/wasm32-wasi/release/swc_plugin_global_esm.wasm",
     "scripts": {
         "demo": "node -r @swc-node/register demo.ts",
