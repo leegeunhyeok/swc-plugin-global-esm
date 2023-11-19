@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import { transform } from '@swc/core';
 import highlight from 'cli-highlight';
 
@@ -47,9 +46,7 @@ export default class {}
       },
       experimental: {
         plugins: [
-          [resolve('target/wasm32-wasi/release/swc_plugin_global_esm.wasm'), {
-            runtimeModule: true,
-          }],
+          ['.', { runtimeModule: true }],
         ],
       },
       externalHelpers: false,
