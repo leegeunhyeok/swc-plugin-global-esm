@@ -38,6 +38,16 @@ await transform(code, {
            * Defaults to `false`.
            */
           runtimeModule: true,
+          /**
+           * Actual module path aliases (resolved module path)
+           *
+           * Defaults to none.
+           */
+          importPaths: {
+            "<import source>": "actual module path",
+            // eg. react
+            "react": "node_modules/react/cjs/react.development.js",
+          },
         }],
       ],
     },

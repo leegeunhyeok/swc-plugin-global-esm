@@ -46,7 +46,12 @@ export default class {}
       },
       experimental: {
         plugins: [
-          ['.', { runtimeModule: true }],
+          ['.', {
+            runtimeModule: true,
+            importPaths: {
+              react: 'node_modules/react/cjs/react.development.js',
+            },
+          }],
         ],
       },
       externalHelpers: false,

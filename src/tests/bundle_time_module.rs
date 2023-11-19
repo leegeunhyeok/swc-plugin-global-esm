@@ -8,6 +8,7 @@ fn plugin() -> Folder<GlobalEsmModule> {
     as_folder(GlobalEsmModule {
         module_name: String::from("test.js"),
         runtime_module: false, // bundle time
+        import_paths: None,
     })
 }
 

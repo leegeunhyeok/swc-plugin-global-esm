@@ -3,6 +3,7 @@ mod utils;
 
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use serde::Deserialize;
+use std::collections::HashMap;
 use swc_core::{
     atoms::js_word,
     common::{Span, DUMMY_SP},
@@ -28,21 +29,34 @@ const MODULE_EXPORT_METHOD_NAME: &str = "export";
 #[serde(rename_all = "camelCase")]
 struct GlobalEsmModuleOptions {
     runtime_module: Option<bool>,
+    import_paths: Option<HashMap<String, String>>,
 }
 
 pub struct GlobalEsmModule {
     module_name: String,
     runtime_module: bool,
+    import_paths: Option<HashMap<String, String>>,
 }
 
 impl GlobalEsmModule {
+    fn to_actual_path(&mut self, module_name: String) -> String {
+        if let Some(actual_path) = self
+            .import_paths
+            .as_ref()
+            .and_then(|import_paths| import_paths.get(&module_name))
+        {
+            return actual_path.clone();
+        }
+        module_name
+    }
+
     fn get_custom_import_expr(&mut self, module_name: String) -> Expr {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
                 Ident::new(js_word!(MODULE_IMPORT_METHOD_NAME), DUMMY_SP),
             ),
-            vec![fn_arg(str_lit_expr(module_name))],
+            vec![fn_arg(str_lit_expr(self.to_actual_path(module_name)))],
         )
     }
 
@@ -219,6 +233,7 @@ pub fn global_esm_plugin(
     program.fold_with(&mut as_folder(GlobalEsmModule {
         module_name: filename,
         runtime_module: config.runtime_module.unwrap_or(false),
+        import_paths: config.import_paths,
     }))
 }
 
@@ -233,3 +248,7 @@ mod esm_export;
 #[cfg(test)]
 #[path = "./tests/bundle_time_module.rs"]
 mod bundle_time_module;
+
+#[cfg(test)]
+#[path = "./tests/import_paths.rs"]
+mod import_paths;
