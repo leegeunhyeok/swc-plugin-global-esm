@@ -124,14 +124,7 @@ impl GlobalEsmModule {
                             })))
                         }
                         ModuleType::Named => {
-                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: prop_ident.sym,
-                                    raw: None,
-                                }),
-                                value: Box::new(Expr::Ident(ident)),
-                            })))
+                            PropOrSpread::Prop(Box::new(Prop::Shorthand(prop_ident)))
                         }
                         ModuleType::NamespaceOrAll => PropOrSpread::Spread(SpreadElement {
                             dot3_token: DUMMY_SP,

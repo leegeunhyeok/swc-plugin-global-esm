@@ -47,7 +47,7 @@ pub fn call_expr(callee: Expr, args: Vec<ExprOrSpread>) -> Expr {
 pub fn decl_var_and_assign_stmt(name: Ident, span: Span, init: Expr) -> Stmt {
     Stmt::Decl(Decl::Var(Box::new(VarDecl {
         span: DUMMY_SP,
-        kind: VarDeclKind::Var,
+        kind: VarDeclKind::Const,
         declare: false,
         decls: vec![VarDeclarator {
             span,
