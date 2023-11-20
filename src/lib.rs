@@ -50,7 +50,7 @@ impl GlobalEsmModule {
         module_name
     }
 
-    fn get_custom_import_expr(&mut self, module_name: String) -> Expr {
+    fn get_global_import_expr(&mut self, module_name: String) -> Expr {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
@@ -60,7 +60,7 @@ impl GlobalEsmModule {
         )
     }
 
-    fn get_custom_export_expr(&mut self, export_expr: Expr) -> Expr {
+    fn get_global_export_expr(&mut self, export_expr: Expr) -> Expr {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
@@ -78,7 +78,7 @@ impl GlobalEsmModule {
             ident,
             span,
             obj_member_expr(
-                self.get_custom_import_expr(module_name),
+                self.get_global_import_expr(module_name),
                 Ident::new("default".into(), DUMMY_SP),
             ),
         )
@@ -89,7 +89,7 @@ impl GlobalEsmModule {
             ident.clone(),
             span,
             obj_member_expr(
-                self.get_custom_import_expr(module_name),
+                self.get_global_import_expr(module_name),
                 Ident::new(ident.sym, DUMMY_SP),
             ),
         )
@@ -99,7 +99,7 @@ impl GlobalEsmModule {
         decl_var_and_assign_stmt(
             ident.clone(),
             span,
-            self.get_custom_import_expr(module_name),
+            self.get_global_import_expr(module_name),
         )
     }
 
@@ -152,11 +152,11 @@ impl GlobalEsmModule {
         })
     }
 
-    fn get_custom_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
+    fn get_global_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
         let exports_obj = self.get_exports_obj_expr(exports);
         Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
-            expr: Box::new(self.get_custom_export_expr(exports_obj)),
+            expr: Box::new(self.get_global_export_expr(exports_obj)),
         })
     }
 }
@@ -209,7 +209,7 @@ impl VisitMut for GlobalEsmModule {
         if is_esm {
             module
                 .body
-                .push(self.get_custom_exports_stmt(exports).into());
+                .push(self.get_global_exports_stmt(exports).into());
         }
     }
 }
