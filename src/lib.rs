@@ -39,6 +39,7 @@ pub struct GlobalEsmModule {
 }
 
 impl GlobalEsmModule {
+    /// Find actual module path from `import_paths`
     fn to_actual_path(&mut self, module_src: String) -> String {
         if let Some(actual_path) = self
             .import_paths
@@ -50,6 +51,9 @@ impl GlobalEsmModule {
         module_src
     }
 
+    /// Returns an expression that import module from global.
+    ///
+    /// eg. `global.__modules.import(module_src)`
     fn get_global_import_expr(&mut self, module_src: String) -> Expr {
         call_expr(
             obj_member_expr(
@@ -60,6 +64,9 @@ impl GlobalEsmModule {
         )
     }
 
+    /// Returns an expression that export module to global.
+    ///
+    /// eg. `global.__modules.export(module_name, expr)`
     fn get_global_export_expr(&mut self, export_expr: Expr) -> Expr {
         call_expr(
             obj_member_expr(
@@ -73,6 +80,9 @@ impl GlobalEsmModule {
         )
     }
 
+    /// Returns a statement that import default value from global.
+    ///
+    /// eg. `const ident = global.__modules.import(module_src).default`
     fn default_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
             ident,
@@ -84,6 +94,9 @@ impl GlobalEsmModule {
         )
     }
 
+    /// Returns a statement that import named value from global.
+    ///
+    /// eg. `const ident = global.__modules.import(module_src).ident`
     fn named_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
             ident.clone(),
@@ -95,10 +108,16 @@ impl GlobalEsmModule {
         )
     }
 
+    /// Returns a statement that import namespaced value from global.
+    ///
+    /// eg. `const ident = global.__modules.import(module_src)`
     fn namespace_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(ident.clone(), span, self.get_global_import_expr(module_src))
     }
 
+    /// Returns an exports object literal expression.
+    ///
+    /// eg. `{ default: value, named: value }`
     fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
         if exports.len() == 0 {
             return Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
@@ -141,6 +160,9 @@ impl GlobalEsmModule {
         })
     }
 
+    /// Returns an exports to global statement.
+    ///
+    /// eg: `global.__modules.export(module_name, exports_obj)`
     fn get_global_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
         let exports_obj = self.get_exports_obj_expr(exports);
         Stmt::Expr(ExprStmt {
@@ -212,12 +234,10 @@ pub fn global_esm_plugin(program: Program, metadata: TransformPluginProgramMetad
     )
     .expect("invalid config for swc-plugin-global-esm");
 
-    let filename = metadata
-        .get_context(&TransformPluginMetadataContextKind::Filename)
-        .unwrap_or_default();
-
     program.fold_with(&mut as_folder(GlobalEsmModule {
-        module_name: filename,
+        module_name: metadata
+            .get_context(&TransformPluginMetadataContextKind::Filename)
+            .unwrap_or_default(),
         runtime_module: config.runtime_module.unwrap_or(false),
         import_paths: config.import_paths,
     }))

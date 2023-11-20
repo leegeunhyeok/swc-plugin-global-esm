@@ -68,12 +68,18 @@ impl ModuleCollector {
         }
     }
 
+    /// Returns private `Ident` and declare ident as variable statement.
+    ///
+    /// eg. `const __export_default = expr`
     fn get_export_decl_stmt_with_private_ident(&mut self, expr: Expr) -> (Ident, Stmt) {
         let export_ident: Ident = private_ident!("__export_default");
         let stmt = decl_var_and_assign_stmt(export_ident.clone(), DUMMY_SP, expr);
         (export_ident, stmt)
     }
 
+    /// Returns an default export statement.
+    ///
+    /// eg. `export default ident`
     fn get_default_export_stmt(&mut self, ident: Ident) -> ModuleDecl {
         ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
             span: DUMMY_SP,
