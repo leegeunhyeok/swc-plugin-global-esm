@@ -12,6 +12,11 @@
       },
     },
   });
+
+  // Define `global` property to global object.
+  if (!('global' in global)) {
+    Object.defineProperty(global, 'global', { value: global });
+  }
 })(
   typeof globalThis !== 'undefined'
     ? globalThis
