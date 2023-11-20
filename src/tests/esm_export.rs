@@ -23,7 +23,7 @@ test!(
     // Output codes after transformed with plugin
     r#"
     const named = new Instance();
-    global.__modules.export("test.js", { "named": named });
+    global.__modules.export("test.js", { named });
     "#
 );
 
@@ -42,7 +42,7 @@ test!(
     function namedFunction() {
         console.log('body');
     }
-    global.__modules.export("test.js", { "namedFunction": namedFunction });
+    global.__modules.export("test.js", { namedFunction });
     "#
 );
 
@@ -60,10 +60,7 @@ test!(
     r#"
     const plain = 0;
     const beforeRename = 1;
-    global.__modules.export("test.js", {
-        "plain": plain,
-        "afterRename": beforeRename
-    });
+    global.__modules.export("test.js", { plain, afterRename: beforeRename });
     "#
 );
 
@@ -77,8 +74,8 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var __export_named = global.__modules.import("module");
-    global.__modules.export("test.js", { "rename": __export_named });
+    const __export_named = global.__modules.import("module");
+    global.__modules.export("test.js", { rename: __export_named });
     "#
 );
 
@@ -92,9 +89,9 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var __export_default = 0;
+    const __export_default = 0;
     global.__modules.export("test.js", {
-        "default": __export_default
+        default: __export_default
     });
     "#
 );
@@ -111,7 +108,7 @@ test!(
     r#"
     class ClassDecl {}
     global.__modules.export("test.js", {
-        "default": ClassDecl
+        default: ClassDecl
     });
     "#
 );
@@ -126,9 +123,9 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var __export_default = class {}
+    const __export_default = class {}
     global.__modules.export("test.js", {
-        "default": __export_default
+        default: __export_default
     });
     "#
 );
@@ -143,7 +140,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var __export_all = global.__modules.import("module");
+    const __export_all = global.__modules.import("module");
     global.__modules.export("test.js", { ...__export_all });
     "#
 );
@@ -158,14 +155,10 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var a = global.__modules.import("module").a;
-    var b = global.__modules.import("module").b;
-    var c = global.__modules.import("module").c;
-    global.__modules.export("test.js", {
-        "a": a,
-        "b": b,
-        "c": c
-    });
+    const a = global.__modules.import("module").a;
+    const b = global.__modules.import("module").b;
+    const c = global.__modules.import("module").c;
+    global.__modules.export("test.js", { a, b, c });
     "#
 );
 
@@ -179,7 +172,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var __dummy = global.__modules.import("dummy").default;
+    const __dummy = global.__modules.import("dummy").default;
     global.__modules.export("test.js", null);
     "#
 );
@@ -209,26 +202,26 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("react").default;
-    var useState = global.__modules.import("react").useState;
-    var useEffect = global.__modules.import("react").useEffect;
-    var Container = global.__modules.import("@app/components").Container;
-    var Section = global.__modules.import("@app/components").Section;
-    var Button = global.__modules.import("@app/components").Button;
-    var Text = global.__modules.import("@app/components").Text;
-    var useCustomHook = global.__modules.import("@app/hooks").useCustomHook;
-    var app = global.__modules.import("@app/core");
+    const React = global.__modules.import("react").default;
+    const useState = global.__modules.import("react").useState;
+    const useEffect = global.__modules.import("react").useEffect;
+    const Container = global.__modules.import("@app/components").Container;
+    const Section = global.__modules.import("@app/components").Section;
+    const Button = global.__modules.import("@app/components").Button;
+    const Text = global.__modules.import("@app/components").Text;
+    const useCustomHook = global.__modules.import("@app/hooks").useCustomHook;
+    const app = global.__modules.import("@app/core");
     function MyComponent() {
         return null;
     }
-    var __export_default = class {
+    const __export_default = class {
         init() {}
     };
     global.__modules.export("test.js", {
-        "MyComponent": MyComponent,
-        "default": __export_default,
-        "app": app,
-        "useCustomHook": useCustomHook
+        MyComponent,
+        default: __export_default,
+        app,
+        useCustomHook
     });
     "#
 );

@@ -22,7 +22,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("react").default;
+    const React = global.__modules.import("react").default;
     global.__modules.export("test.js", null);
     "#
 );
@@ -37,8 +37,8 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var useState = global.__modules.import("react").useState;
-    var useContext = global.__modules.import("react").useContext;
+    const useState = global.__modules.import("react").useState;
+    const useContext = global.__modules.import("react").useContext;
     global.__modules.export("test.js", null);
     "#
 );
@@ -53,9 +53,9 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("react").default;
-    var useState = global.__modules.import("react").useState;
-    var useContext = global.__modules.import("react").useContext;
+    const React = global.__modules.import("react").default;
+    const useState = global.__modules.import("react").useState;
+    const useContext = global.__modules.import("react").useContext;
     global.__modules.export("test.js", null);
     "#
 );
@@ -70,7 +70,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var ReactAll = global.__modules.import("react");
+    const ReactAll = global.__modules.import("react");
     global.__modules.export("test.js", null);
     "#
 );
@@ -87,9 +87,9 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("react").default;
-    var useState = global.__modules.import("react").useState;
-    var useContext = global.__modules.import("react").useContext;
+    const React = global.__modules.import("react").default;
+    const useState = global.__modules.import("react").useState;
+    const useContext = global.__modules.import("react").useContext;
     function testFn() {}
     class TestClass {}
     global.__modules.export("test.js", null);

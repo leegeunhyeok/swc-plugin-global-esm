@@ -130,27 +130,28 @@ impl GlobalEsmModule {
                  as_ident,
                  module_type,
              }| {
-                if let Some(prop_ident) = as_ident.or(Some(ident.clone())) {
-                    export_props.push(match module_type {
-                        ModuleType::Default => {
+                export_props.push(match module_type {
+                    ModuleType::Default => {
+                        PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
+                            key: PropName::Ident(Ident::new(js_word!("default"), DUMMY_SP)),
+                            value: Box::new(Expr::Ident(ident)),
+                        })))
+                    }
+                    ModuleType::Named => {
+                        if let Some(renamed_ident) = as_ident {
                             PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Str(Str {
-                                    span: DUMMY_SP,
-                                    value: js_word!("default"),
-                                    raw: None,
-                                }),
+                                key: PropName::Ident(Ident::new(renamed_ident.sym, DUMMY_SP)),
                                 value: Box::new(Expr::Ident(ident)),
                             })))
+                        } else {
+                            PropOrSpread::Prop(Box::new(Prop::Shorthand(ident)))
                         }
-                        ModuleType::Named => {
-                            PropOrSpread::Prop(Box::new(Prop::Shorthand(prop_ident)))
-                        }
-                        ModuleType::NamespaceOrAll => PropOrSpread::Spread(SpreadElement {
-                            dot3_token: DUMMY_SP,
-                            expr: Box::new(Expr::Ident(ident)),
-                        }),
-                    });
-                }
+                    }
+                    ModuleType::NamespaceOrAll => PropOrSpread::Spread(SpreadElement {
+                        dot3_token: DUMMY_SP,
+                        expr: Box::new(Expr::Ident(ident)),
+                    }),
+                });
             },
         );
 

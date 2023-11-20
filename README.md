@@ -82,15 +82,15 @@ After
 
 ```js
 // with `runtimeModule: true`
-var React = global.__modules.import("react").default;
-var useState = global.__modules.import("react").useState;
-var useEffect = global.__modules.import("react").useEffect;
-var Container = global.__modules.import("@app/components").Container;
-var Section = global.__modules.import("@app/components").Section;
-var Button = global.__modules.import("@app/components").Button;
-var Text = global.__modules.import("@app/components").Text;
-var useCustomHook = global.__modules.import("@app/hooks").useCustomHook;
-var app = global.__modules.import("@app/core");
+const React = global.__modules.import("react").default;
+const useState = global.__modules.import("react").useState;
+const useEffect = global.__modules.import("react").useEffect;
+const Container = global.__modules.import("@app/components").Container;
+const Section = global.__modules.import("@app/components").Section;
+const Button = global.__modules.import("@app/components").Button;
+const Text = global.__modules.import("@app/components").Text;
+const useCustomHook = global.__modules.import("@app/hooks").useCustomHook;
+const app = global.__modules.import("@app/core");
 
 function MyComponent () {
   // ...
@@ -99,8 +99,8 @@ function MyComponent () {
 var __export_default = class {}
 
 global.__modules.export("<module-file-name>", {
-  "MyComponent": MyComponent,
-  "default": __export_default
+  default: __export_default,
+  MyComponent
 });
 ```
 

@@ -32,7 +32,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("react").default;
+    const React = global.__modules.import("react").default;
     global.__modules.export("test.js", null);
     "#
 );
@@ -47,7 +47,7 @@ test!(
     "#,
     // Output codes after transformed with plugin
     r#"
-    var React = global.__modules.import("node_modules/react/cjs/react.development.js").default;
+    const React = global.__modules.import("node_modules/react/cjs/react.development.js").default;
     global.__modules.export("test.js", null);
     "#
 );
