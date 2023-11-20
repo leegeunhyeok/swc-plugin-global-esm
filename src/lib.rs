@@ -39,24 +39,24 @@ pub struct GlobalEsmModule {
 }
 
 impl GlobalEsmModule {
-    fn to_actual_path(&mut self, module_name: String) -> String {
+    fn to_actual_path(&mut self, module_src: String) -> String {
         if let Some(actual_path) = self
             .import_paths
             .as_ref()
-            .and_then(|import_paths| import_paths.get(&module_name))
+            .and_then(|import_paths| import_paths.get(&module_src))
         {
             return actual_path.clone();
         }
-        module_name
+        module_src
     }
 
-    fn get_global_import_expr(&mut self, module_name: String) -> Expr {
+    fn get_global_import_expr(&mut self, module_src: String) -> Expr {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
                 Ident::new(js_word!(MODULE_IMPORT_METHOD_NAME), DUMMY_SP),
             ),
-            vec![fn_arg(str_lit_expr(self.to_actual_path(module_name)))],
+            vec![fn_arg(str_lit_expr(self.to_actual_path(module_src)))],
         )
     }
 
@@ -73,34 +73,30 @@ impl GlobalEsmModule {
         )
     }
 
-    fn default_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
+    fn default_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
             ident,
             span,
             obj_member_expr(
-                self.get_global_import_expr(module_name),
+                self.get_global_import_expr(module_src),
                 Ident::new("default".into(), DUMMY_SP),
             ),
         )
     }
 
-    fn named_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
+    fn named_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
             ident.clone(),
             span,
             obj_member_expr(
-                self.get_global_import_expr(module_name),
+                self.get_global_import_expr(module_src),
                 Ident::new(ident.sym, DUMMY_SP),
             ),
         )
     }
 
-    fn namespace_import_stmt(&mut self, module_name: String, span: Span, ident: Ident) -> Stmt {
-        decl_var_and_assign_stmt(
-            ident.clone(),
-            span,
-            self.get_global_import_expr(module_name),
-        )
+    fn namespace_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
+        decl_var_and_assign_stmt(ident.clone(), span, self.get_global_import_expr(module_src))
     }
 
     fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
