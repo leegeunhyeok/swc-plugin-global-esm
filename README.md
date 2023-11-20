@@ -96,7 +96,7 @@ function MyComponent () {
   // ...
 }
 
-var __export_default = class {}
+const __export_default = class {}
 
 global.__modules.export("<module-file-name>", {
   default: __export_default,
