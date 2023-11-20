@@ -40,6 +40,7 @@ export default class {}
     isModule: true,
     filename: 'demo.tsx',
     jsc: {
+      target: 'es5',
       parser: {
         syntax: 'typescript',
         tsx: true,
