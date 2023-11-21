@@ -6,7 +6,11 @@ import React, { useState, useEffect } from 'react';
 import { Container, Section, Button, Text } from '@app/components';
 import { useCustomHook } from '@app/hooks';
 
-export function MyComponent (): JSX.Element {
+export interface MyComponentProps {
+  message?: string;
+}
+
+export function MyComponent({ message = 'Hello, world!' }: MyComponentProps): JSX.Element {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -18,7 +22,7 @@ export function MyComponent (): JSX.Element {
   return (
     <Container>
       <Section>
-        <Text>{'Hello, World'}</Text>
+        <Text>{message}</Text>
       </Section>
       <Section>
         <Text>{count}</Text>
