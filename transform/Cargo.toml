@@ -1,0 +1,14 @@
+[package]
+name = "swc_global_esm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1"
+swc_core = { version = "0.85.*", features = ["ecma_plugin_transform", "ecma_utils"] }
+tracing = "0.1.40"
+
+[dev-dependencies]
+swc_ecma_parser = "0.141.26"
+swc_ecma_transforms_testing = "0.137.44"
+testing = "0.35.11"

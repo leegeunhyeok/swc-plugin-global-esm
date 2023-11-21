@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "rootDir": ".",
     "types": ["node"],
     "module": "commonjs",
@@ -10,5 +11,6 @@
       "es6"
     ]
   },
-  "include": ["build.ts", "demo.ts"]
+  "include": ["build.ts", "demo.ts"],
+  "exclude": ["transform/tests/fixtures/**/*.ts"]
 }
