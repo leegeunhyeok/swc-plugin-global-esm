@@ -13,6 +13,8 @@ use tracing::debug;
 pub enum ModuleType {
     Default,
     Named,
+    // `export { default as ... } from ...`
+    DefaultAsNamed,
     // import: namespace
     // export: all
     NamespaceOrAll,
@@ -205,6 +207,8 @@ impl VisitMut for ModuleCollector {
                         }
                     }
                     // `export { ... }`
+                    // `export { ident as ... }`
+                    // `export { default as ... }`
                     ModuleDecl::ExportNamed(NamedExport {
                         type_only: false, ..
                     }) => {
@@ -295,16 +299,42 @@ impl VisitMut for ModuleCollector {
     }
 
     fn visit_mut_named_export(&mut self, named_export: &mut NamedExport) {
+        debug!("named export {:#?}", named_export);
         match named_export {
-            NamedExport { src: None, .. } => named_export.visit_mut_children_with(self),
+            NamedExport {
+                src: None,
+                specifiers,
+                ..
+            } => {
+                specifiers
+                    .to_owned()
+                    .into_iter()
+                    .for_each(|export_spec| match export_spec {
+                        ExportSpecifier::Named(ExportNamedSpecifier {
+                            orig: ModuleExportName::Ident(orig_ident),
+                            exported,
+                            is_type_only: false,
+                            ..
+                        }) => match &exported {
+                            Some(ModuleExportName::Ident(as_ident)) => self.exports.push(
+                                ExportModule::named(orig_ident.clone(), Some(as_ident.clone())),
+                            ),
+                            _ => self
+                                .exports
+                                .push(ExportModule::named(orig_ident.clone(), None)),
+                        },
+                        _ => {}
+                    });
+            }
             NamedExport {
                 src: Some(module_src),
+                specifiers,
                 ..
             } => {
                 if let Some(ExportSpecifier::Namespace(ExportNamespaceSpecifier {
                     span,
                     name: ModuleExportName::Ident(module_ident),
-                })) = named_export.specifiers.get(0)
+                })) = specifiers.get(0)
                 {
                     debug!("namespace export: {:#?}", module_ident.sym);
                     let export_ident: Ident = private_ident!("__export_named");
@@ -319,41 +349,49 @@ impl VisitMut for ModuleCollector {
                         Some(module_ident.to_owned()),
                     ));
                 } else {
-                    named_export
-                        .specifiers
+                    specifiers
                         .to_owned()
                         .into_iter()
                         .for_each(|import_spec| match import_spec {
-                            ExportSpecifier::Named(ExportNamedSpecifier { span, orig, .. }) => {
+                            ExportSpecifier::Named(ExportNamedSpecifier {
+                                span,
+                                orig,
+                                exported,
+                                ..
+                            }) => {
                                 if let ModuleExportName::Ident(orig_ident) = &orig {
-                                    debug!("named export: {:#?}", orig_ident.sym);
+                                    let is_default = orig_ident.sym == "default";
+                                    let target_ident = if is_default {
+                                        private_ident!("__default")
+                                    } else {
+                                        orig_ident.clone()
+                                    };
                                     self.imports.push(ImportModule {
                                         span,
-                                        ident: orig_ident.clone(),
+                                        ident: target_ident.clone(),
                                         module_src: module_src.value.to_string(),
-                                        module_type: ModuleType::Named,
+                                        module_type: if is_default {
+                                            ModuleType::DefaultAsNamed
+                                        } else {
+                                            ModuleType::Named
+                                        },
                                     });
+                                    match &exported {
+                                        Some(ModuleExportName::Ident(as_ident)) => {
+                                            self.exports.push(ExportModule::named(
+                                                target_ident,
+                                                Some(as_ident.clone()),
+                                            ))
+                                        }
+                                        _ => self
+                                            .exports
+                                            .push(ExportModule::named(target_ident, None)),
+                                    }
                                 }
                             }
-                            _ => (),
+                            _ => {}
                         });
-                    named_export.visit_mut_children_with(self);
                 }
-            }
-        }
-    }
-
-    fn visit_mut_export_named_specifier(&mut self, named_spec: &mut ExportNamedSpecifier) {
-        if let ModuleExportName::Ident(orig_ident) = &named_spec.orig {
-            debug!("named export: {:#?}", orig_ident.sym);
-            match &named_spec.exported {
-                Some(ModuleExportName::Ident(as_ident)) => self.exports.push(ExportModule::named(
-                    orig_ident.clone(),
-                    Some(as_ident.clone()),
-                )),
-                _ => self
-                    .exports
-                    .push(ExportModule::named(orig_ident.clone(), None)),
             }
         }
     }

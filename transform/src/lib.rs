@@ -119,7 +119,7 @@ impl GlobalEsmModule {
                  module_type,
              }| {
                 export_props.push(match module_type {
-                    ModuleType::Default => {
+                    ModuleType::Default | ModuleType::DefaultAsNamed => {
                         PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
                             key: PropName::Ident(Ident::new(js_word!("default"), DUMMY_SP)),
                             value: Box::new(Expr::Ident(ident)),
@@ -184,7 +184,7 @@ impl VisitMut for GlobalEsmModule {
                     module_type,
                 },
             )| match module_type {
-                ModuleType::Default => {
+                ModuleType::Default | ModuleType::DefaultAsNamed => {
                     module.body.insert(
                         index,
                         self.default_import_stmt(module_src, span, ident).into(),

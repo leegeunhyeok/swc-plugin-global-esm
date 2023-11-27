@@ -6,6 +6,9 @@ import React, { useState, useEffect } from 'react';
 import { Container, Section, Button, Text } from '@app/components';
 import { useCustomHook } from '@app/hooks';
 
+export { default as A } from 'a';
+export { default as B } from 'b';
+
 export interface MyComponentProps {
   message?: string;
 }
