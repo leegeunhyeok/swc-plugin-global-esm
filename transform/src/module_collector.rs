@@ -166,7 +166,7 @@ impl VisitMut for ModuleCollector {
                     // Imports
                     ModuleDecl::Import(_) => {
                         if self.runtime_module {
-                            module_decl.visit_mut_with(self);
+                            module_decl.visit_mut_children_with(self);
                         } else {
                             module_body.push(module_decl.into());
                         }
@@ -181,7 +181,7 @@ impl VisitMut for ModuleCollector {
                         } else {
                             module_body.push(module_decl.clone().into());
                         }
-                        module_decl.visit_mut_with(self);
+                        module_decl.visit_mut_children_with(self);
                     }
                     // `export default function ...`
                     // `export default class ...`
@@ -212,7 +212,7 @@ impl VisitMut for ModuleCollector {
                     ModuleDecl::ExportNamed(NamedExport {
                         type_only: false, ..
                     }) => {
-                        module_decl.visit_mut_with(self);
+                        module_decl.visit_mut_children_with(self);
                         if !self.runtime_module {
                             module_body.push(module_decl.into());
                         }
@@ -221,7 +221,7 @@ impl VisitMut for ModuleCollector {
                     ModuleDecl::ExportAll(ExportAll {
                         type_only: false, ..
                     }) => {
-                        module_decl.visit_mut_with(self);
+                        module_decl.visit_mut_children_with(self);
                         if !self.runtime_module {
                             module_body.push(module_decl.into());
                         }
