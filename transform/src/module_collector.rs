@@ -1,9 +1,9 @@
 use crate::utils::decl_var_and_assign_stmt;
 use swc_core::{
-    common::DUMMY_SP,
+    common::{Mark, DUMMY_SP},
     ecma::{
         ast::*,
-        utils::private_ident,
+        utils::{private_ident, quote_ident},
         visit::{VisitMut, VisitMutWith},
     },
 };
@@ -210,72 +210,39 @@ impl ModuleCollector {
     }
 
     fn collect_named_re_export_specifiers(&mut self, specifiers: &Vec<ExportSpecifier>, src: &Str) {
-        if let Some(ExportSpecifier::Namespace(ExportNamespaceSpecifier {
-            name: ModuleExportName::Ident(module_ident),
-            ..
-        })) = specifiers.get(0)
-        {
-            let export_ident = private_ident!("__re_export_named");
-            self.imports.push(ImportModule {
-                ident: export_ident.clone(),
-                module_src: src.value.to_string(),
-                module_type: ModuleType::NamespaceOrAll,
-            });
-            self.exports.push(ExportModule::named(
-                export_ident,
-                Some(module_ident.clone()),
-            ));
-        } else {
-            specifiers
-                .to_owned()
-                .into_iter()
-                .for_each(|import_spec| match import_spec {
-                    ExportSpecifier::Named(ExportNamedSpecifier { orig, exported, .. }) => {
-                        if let ModuleExportName::Ident(orig_ident) = &orig {
-                            let is_default = orig_ident.sym == "default";
-                            let target_ident = if is_default {
-                                private_ident!("__default")
+        specifiers
+            .to_owned()
+            .into_iter()
+            .for_each(|import_spec| match import_spec {
+                ExportSpecifier::Named(ExportNamedSpecifier { orig, exported, .. }) => {
+                    if let ModuleExportName::Ident(orig_ident) = &orig {
+                        let is_default = orig_ident.sym == "default";
+                        let target_ident = if is_default {
+                            private_ident!("__default")
+                        } else {
+                            private_ident!(orig_ident.span, orig_ident.sym.clone())
+                        };
+                        self.imports.push(ImportModule {
+                            ident: target_ident.clone(),
+                            module_src: src.value.to_string(),
+                            module_type: if is_default {
+                                ModuleType::DefaultAsNamed
                             } else {
-                                orig_ident.clone()
-                            };
-                            self.imports.push(ImportModule {
-                                ident: target_ident.clone(),
-                                module_src: src.value.to_string(),
-                                module_type: if is_default {
-                                    ModuleType::DefaultAsNamed
-                                } else {
-                                    ModuleType::Named
-                                },
-                            });
-                            match &exported {
-                                Some(ModuleExportName::Ident(as_ident)) => self.exports.push(
-                                    ExportModule::named(target_ident, Some(as_ident.clone())),
-                                ),
-                                _ => self.exports.push(ExportModule::named(target_ident, None)),
-                            }
+                                ModuleType::Named
+                            },
+                        });
+                        match &exported {
+                            Some(ModuleExportName::Ident(as_ident)) => self
+                                .exports
+                                .push(ExportModule::named(target_ident, Some(as_ident.clone()))),
+                            _ => self
+                                .exports
+                                .push(ExportModule::named(target_ident, Some(orig_ident.clone()))),
                         }
                     }
-                    _ => {}
-                });
-        }
-    }
-
-    fn collect_namespace_re_export_specifier(&mut self, specifier: &ExportSpecifier, src: &Str) {
-        if let Some(ExportNamespaceSpecifier {
-            name: ModuleExportName::Ident(module_ident),
-            ..
-        }) = specifier.as_namespace()
-        {
-            let export_ident = private_ident!("__re_export");
-            self.imports.push(ImportModule::namespace(
-                export_ident.clone(),
-                src.value.to_string(),
-            ));
-            self.exports.push(ExportModule::named(
-                export_ident,
-                Some(module_ident.clone()),
-            ));
-        }
+                }
+                _ => {}
+            });
     }
 }
 
@@ -426,15 +393,21 @@ impl VisitMut for ModuleCollector {
                 specifiers,
                 ..
             } => {
-                if let Some(
-                    namespace_specifier @ ExportSpecifier::Namespace(ExportNamespaceSpecifier {
-                        name: ModuleExportName::Ident(_),
-                        ..
-                    }),
-                ) = specifiers.get(0)
+                if let Some(ExportSpecifier::Namespace(ExportNamespaceSpecifier {
+                    name: ModuleExportName::Ident(module_ident),
+                    ..
+                })) = specifiers.get(0)
                 {
                     // Case 1
-                    self.collect_namespace_re_export_specifier(namespace_specifier, module_src);
+                    let export_ident = private_ident!("__re_export");
+                    self.imports.push(ImportModule::namespace(
+                        export_ident.clone(),
+                        module_src.value.to_string(),
+                    ));
+                    self.exports.push(ExportModule::named(
+                        export_ident,
+                        Some(module_ident.clone()),
+                    ));
                 } else {
                     // Case 2
                     self.collect_named_re_export_specifiers(specifiers, module_src);

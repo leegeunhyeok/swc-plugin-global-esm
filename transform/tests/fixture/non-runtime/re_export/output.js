@@ -1,5 +1,5 @@
-const a = global.__modules.import("module").a;
-const b = global.__modules.import("module").b;
-const c = global.__modules.import("module").c;
+import { a } from "module";
+import { b } from "module";
+import { c } from "module";
 export { a, b, c } from 'module';
 global.__modules.export("test.js", { a, b, c });

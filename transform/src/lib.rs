@@ -71,41 +71,97 @@ impl GlobalEsmModule {
 
     /// Returns a statement that import default value from global.
     ///
-    /// eg. `const ident = global.__modules.import(module_src).default`
-    fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
-        decl_var_and_assign_stmt(
-            ident.clone(),
-            ident.span,
-            obj_member_expr(
-                self.get_global_import_expr(module_src),
-                quote_ident!("default"),
-            ),
-        )
+    /// eg. `const ident = global.__modules.import("module_src").default`
+    /// eg. `import ident from "module_src"`
+    fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+        if self.runtime_module {
+            ModuleItem::Stmt(decl_var_and_assign_stmt(
+                ident.clone(),
+                ident.span,
+                obj_member_expr(
+                    self.get_global_import_expr(module_src),
+                    quote_ident!("default"),
+                ),
+            ))
+        } else {
+            ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                span: DUMMY_SP,
+                src: Box::new(Str {
+                    span: DUMMY_SP,
+                    raw: None,
+                    value: module_src.into(),
+                }),
+                type_only: false,
+                with: None,
+                specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+                    span: DUMMY_SP,
+                    local: ident.clone(),
+                })],
+            }))
+        }
     }
 
     /// Returns a statement that import named value from global.
     ///
-    /// eg. `const ident = global.__modules.import(module_src).ident`
-    fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
-        decl_var_and_assign_stmt(
-            ident.clone(),
-            ident.span,
-            obj_member_expr(
-                self.get_global_import_expr(module_src),
-                quote_ident!(ident.sym),
-            ),
-        )
+    /// eg. `const ident = global.__modules.import("module_src").ident`
+    /// eg. `import { ident } from "module_src"`
+    fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+        if self.runtime_module {
+            ModuleItem::Stmt(decl_var_and_assign_stmt(
+                ident.clone(),
+                ident.span,
+                obj_member_expr(
+                    self.get_global_import_expr(module_src),
+                    quote_ident!(ident.sym),
+                ),
+            ))
+        } else {
+            ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                span: DUMMY_SP,
+                src: Box::new(Str {
+                    span: DUMMY_SP,
+                    raw: None,
+                    value: module_src.into(),
+                }),
+                type_only: false,
+                with: None,
+                specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                    span: DUMMY_SP,
+                    local: ident.clone(),
+                    imported: None,
+                    is_type_only: false,
+                })],
+            }))
+        }
     }
 
     /// Returns a statement that import namespaced value from global.
     ///
-    /// eg. `const ident = global.__modules.import(module_src)`
-    fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
-        decl_var_and_assign_stmt(
-            ident.clone(),
-            ident.span,
-            self.get_global_import_expr(module_src),
-        )
+    /// eg. `const ident = global.__modules.import("module_src")`
+    /// eg. `import * as ident from "module_src"`
+    fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+        if self.runtime_module {
+            ModuleItem::Stmt(decl_var_and_assign_stmt(
+                ident.clone(),
+                ident.span,
+                self.get_global_import_expr(module_src),
+            ))
+        } else {
+            ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+                span: DUMMY_SP,
+                src: Box::new(Str {
+                    span: DUMMY_SP,
+                    raw: None,
+                    value: module_src.into(),
+                }),
+                type_only: false,
+                with: None,
+                specifiers: vec![ImportSpecifier::Namespace(ImportStarAsSpecifier {
+                    span: DUMMY_SP,
+                    local: ident.clone(),
+                })],
+            }))
+        }
     }
 
     /// Returns an exports object literal expression.
@@ -131,9 +187,11 @@ impl GlobalEsmModule {
                         })))
                     }
                     ModuleType::Named => {
-                        if let Some(renamed_ident) = as_ident {
+                        if let Some(renamed_ident) =
+                            as_ident.as_ref().filter(|&id| id.sym != ident.sym)
+                        {
                             PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Ident(Ident::new(renamed_ident.sym, DUMMY_SP)),
+                                key: PropName::Ident(quote_ident!(renamed_ident.sym.as_str())),
                                 value: Box::new(Expr::Ident(ident)),
                             })))
                         } else {
@@ -191,17 +249,17 @@ impl VisitMut for GlobalEsmModule {
                 ModuleType::Default | ModuleType::DefaultAsNamed => {
                     module
                         .body
-                        .insert(index, self.default_import_stmt(module_src, ident).into());
+                        .insert(index, self.default_import_stmt(module_src, ident));
                 }
                 ModuleType::Named => {
                     module
                         .body
-                        .insert(index, self.named_import_stmt(module_src, ident).into());
+                        .insert(index, self.named_import_stmt(module_src, ident));
                 }
                 ModuleType::NamespaceOrAll => {
                     module
                         .body
-                        .insert(index, self.namespace_import_stmt(module_src, ident).into());
+                        .insert(index, self.namespace_import_stmt(module_src, ident));
                 }
             },
         );
