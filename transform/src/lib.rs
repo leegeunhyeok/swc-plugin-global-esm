@@ -5,9 +5,10 @@ use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use std::collections::HashMap;
 use swc_core::{
     atoms::js_word,
-    common::{Span, DUMMY_SP},
+    common::DUMMY_SP,
     ecma::{
         ast::*,
+        utils::quote_ident,
         visit::{as_folder, noop_visit_mut_type, Fold, VisitMut, VisitMutWith},
     },
 };
@@ -46,7 +47,7 @@ impl GlobalEsmModule {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
-                Ident::new(js_word!(MODULE_IMPORT_METHOD_NAME), DUMMY_SP),
+                quote_ident!(MODULE_IMPORT_METHOD_NAME),
             ),
             vec![fn_arg(str_lit_expr(self.to_actual_path(module_src)))],
         )
@@ -59,7 +60,7 @@ impl GlobalEsmModule {
         call_expr(
             obj_member_expr(
                 obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
-                Ident::new(js_word!(MODULE_EXPORT_METHOD_NAME), DUMMY_SP),
+                quote_ident!(MODULE_EXPORT_METHOD_NAME),
             ),
             vec![
                 fn_arg(str_lit_expr(self.module_name.to_owned())),
@@ -71,13 +72,13 @@ impl GlobalEsmModule {
     /// Returns a statement that import default value from global.
     ///
     /// eg. `const ident = global.__modules.import(module_src).default`
-    fn default_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
+    fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
-            ident,
-            span,
+            ident.clone(),
+            ident.span,
             obj_member_expr(
                 self.get_global_import_expr(module_src),
-                Ident::new("default".into(), DUMMY_SP),
+                quote_ident!("default"),
             ),
         )
     }
@@ -85,13 +86,13 @@ impl GlobalEsmModule {
     /// Returns a statement that import named value from global.
     ///
     /// eg. `const ident = global.__modules.import(module_src).ident`
-    fn named_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
+    fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
         decl_var_and_assign_stmt(
             ident.clone(),
-            span,
+            ident.span,
             obj_member_expr(
                 self.get_global_import_expr(module_src),
-                Ident::new(ident.sym, DUMMY_SP),
+                quote_ident!(ident.sym),
             ),
         )
     }
@@ -99,8 +100,12 @@ impl GlobalEsmModule {
     /// Returns a statement that import namespaced value from global.
     ///
     /// eg. `const ident = global.__modules.import(module_src)`
-    fn namespace_import_stmt(&mut self, module_src: String, span: Span, ident: Ident) -> Stmt {
-        decl_var_and_assign_stmt(ident.clone(), span, self.get_global_import_expr(module_src))
+    fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> Stmt {
+        decl_var_and_assign_stmt(
+            ident.clone(),
+            ident.span,
+            self.get_global_import_expr(module_src),
+        )
     }
 
     /// Returns an exports object literal expression.
@@ -178,29 +183,25 @@ impl VisitMut for GlobalEsmModule {
             |(
                 index,
                 ImportModule {
-                    span,
                     ident,
                     module_src,
                     module_type,
                 },
             )| match module_type {
                 ModuleType::Default | ModuleType::DefaultAsNamed => {
-                    module.body.insert(
-                        index,
-                        self.default_import_stmt(module_src, span, ident).into(),
-                    );
+                    module
+                        .body
+                        .insert(index, self.default_import_stmt(module_src, ident).into());
                 }
                 ModuleType::Named => {
-                    module.body.insert(
-                        index,
-                        self.named_import_stmt(module_src, span, ident).into(),
-                    );
+                    module
+                        .body
+                        .insert(index, self.named_import_stmt(module_src, ident).into());
                 }
                 ModuleType::NamespaceOrAll => {
-                    module.body.insert(
-                        index,
-                        self.namespace_import_stmt(module_src, span, ident).into(),
-                    );
+                    module
+                        .body
+                        .insert(index, self.namespace_import_stmt(module_src, ident).into());
                 }
             },
         );

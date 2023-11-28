@@ -1,2 +1,2 @@
-const __export_named = global.__modules.import("module");
-global.__modules.export("test.js", { rename: __export_named });
+const __re_export = global.__modules.import("module");
+global.__modules.export("test.js", { rename: __re_export });
