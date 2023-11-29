@@ -166,10 +166,13 @@ impl GlobalEsmModule {
 
     /// Returns an exports object literal expression.
     ///
-    /// eg. `{ default: value, named: value }`
+    /// eg. `{ default: value, named: value }` or `{}`
     fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
         if exports.len() == 0 {
-            return Expr::Lit(Lit::Null(Null { span: DUMMY_SP }));
+            return Expr::Object(ObjectLit {
+                span: DUMMY_SP,
+                props: Vec::new(),
+            });
         }
 
         let mut export_props = Vec::new();
