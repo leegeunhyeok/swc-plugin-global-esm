@@ -13,7 +13,7 @@ yarn add swc-plugin-global-esm
 
 ## Usage
 
-Inject runtime script to top of bundle.
+Inject runtime script to top of bundle for using [Global ESM APIs](./runtime/index.ts).
 
 ```ts
 import 'swc-plugin-global-esm/runtime';
@@ -64,7 +64,7 @@ await transform(code, {
 
 Before
 
-```ts
+```tsx
 import React, { useState, useEffect } from 'react';
 import { Container, Section, Button, Text } from '@app/components';
 import { useCustomHook } from '@app/hooks';
