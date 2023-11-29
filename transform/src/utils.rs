@@ -30,3 +30,11 @@ pub fn decl_var_and_assign_stmt(name: Ident, span: Span, init: Expr) -> Stmt {
         }],
     })))
 }
+
+pub fn obj_lit(props: Option<Vec<PropOrSpread>>) -> Expr {
+    ObjectLit {
+        span: DUMMY_SP,
+        props: props.unwrap_or(Vec::new()),
+    }
+    .into()
+}

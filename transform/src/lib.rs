@@ -11,7 +11,7 @@ use swc_core::{
         visit::{as_folder, noop_visit_mut_type, Fold, VisitMut, VisitMutWith},
     },
 };
-use utils::{decl_var_and_assign_stmt, obj_member_expr};
+use utils::{decl_var_and_assign_stmt, obj_lit, obj_member_expr};
 
 const GLOBAL: &str = "global";
 const MODULE: &str = "__modules";
@@ -78,18 +78,21 @@ impl GlobalEsmModule {
     /// Returns an expression that export module to global.
     ///
     /// eg. `global.__modules.export(module_name, expr)`
-    fn get_global_export_expr(&mut self, export_expr: Expr) -> Expr {
+    fn get_global_export_expr(&mut self, export_expr: Expr, export_all_expr: Option<Expr>) -> Expr {
+        let mut export_args = vec![
+            Str::from(self.module_name.clone()).as_arg(),
+            export_expr.as_arg(),
+        ];
+
+        if let Some(export_all) = export_all_expr {
+            export_args.push(export_all.into());
+        }
+
         obj_member_expr(
             obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
             quote_ident!(MODULE_EXPORT_METHOD_NAME),
         )
-        .as_call(
-            DUMMY_SP,
-            vec![
-                Str::from(self.module_name.clone()).as_arg(),
-                export_expr.as_arg(),
-            ],
-        )
+        .as_call(DUMMY_SP, export_args)
     }
 
     /// Returns a statement that import default value from global.
@@ -181,68 +184,76 @@ impl GlobalEsmModule {
         }
     }
 
-    /// Returns an exports object literal expression.
+    /// Returns export and export all object literal expression.
     ///
-    /// eg. `{ default: value, named: value }` or `{}`
-    fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
+    /// Export eg. `{ default: value, named: value }` or `{}`
+    /// Export all eg. `{ ...all_export } or None`
+    fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> (Expr, Option<Expr>) {
         if exports.len() == 0 {
-            return ObjectLit {
-                span: DUMMY_SP,
-                props: Vec::new(),
-            }
-            .into();
+            return (obj_lit(None), None);
         }
 
         let mut export_props = Vec::new();
+        let mut export_all_props: Vec<PropOrSpread> = Vec::new();
         exports.into_iter().for_each(
             |ExportModule {
                  ident,
                  as_ident,
                  module_type,
              }| {
-                export_props.push(match module_type {
+                match module_type {
                     ModuleType::Default | ModuleType::DefaultAsNamed => {
-                        Prop::KeyValue(KeyValueProp {
-                            key: quote_ident!("default").into(),
-                            value: ident.into(),
-                        })
-                        .into()
-                    }
-                    ModuleType::Named => {
-                        if let Some(renamed_ident) =
-                            as_ident.as_ref().filter(|&id| id.sym != ident.sym)
-                        {
+                        export_props.push(
                             Prop::KeyValue(KeyValueProp {
-                                key: quote_ident!(renamed_ident.sym.as_str()).into(),
+                                key: quote_ident!("default").into(),
                                 value: ident.into(),
                             })
-                            .into()
-                        } else {
-                            Prop::Shorthand(ident).into()
+                            .into(),
+                        );
+                    }
+                    ModuleType::Named => {
+                        export_props.push(
+                            if let Some(renamed_ident) =
+                                as_ident.as_ref().filter(|&id| id.sym != ident.sym)
+                            {
+                                Prop::KeyValue(KeyValueProp {
+                                    key: quote_ident!(renamed_ident.sym.as_str()).into(),
+                                    value: ident.into(),
+                                })
+                                .into()
+                            } else {
+                                Prop::Shorthand(ident).into()
+                            },
+                        );
+                    }
+                    ModuleType::NamespaceOrAll => export_all_props.push(
+                        SpreadElement {
+                            dot3_token: DUMMY_SP,
+                            expr: ident.into(),
                         }
-                    }
-                    ModuleType::NamespaceOrAll => SpreadElement {
-                        dot3_token: DUMMY_SP,
-                        expr: ident.into(),
-                    }
-                    .into(),
-                });
+                        .into(),
+                    ),
+                }
             },
         );
 
-        ObjectLit {
-            span: DUMMY_SP,
-            props: export_props,
-        }
-        .into()
+        (
+            obj_lit(Some(export_props)),
+            if export_all_props.len() > 0 {
+                Some(obj_lit(Some(export_all_props)))
+            } else {
+                None
+            },
+        )
     }
 
     /// Returns an exports to global statement.
     ///
     /// eg: `global.__modules.export(module_name, exports_obj)`
     fn get_global_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
-        let exports_obj = self.get_exports_obj_expr(exports);
-        self.get_global_export_expr(exports_obj).into_stmt()
+        let (export_obj, export_all_obj) = self.get_exports_obj_expr(exports);
+        self.get_global_export_expr(export_obj, export_all_obj)
+            .into_stmt()
     }
 }
 
