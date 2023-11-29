@@ -4,17 +4,14 @@ mod utils;
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use std::collections::HashMap;
 use swc_core::{
-    atoms::js_word,
     common::DUMMY_SP,
     ecma::{
         ast::*,
-        utils::quote_ident,
+        utils::{quote_ident, ExprFactory},
         visit::{as_folder, noop_visit_mut_type, Fold, VisitMut, VisitMutWith},
     },
 };
-use utils::{
-    call_expr, decl_var_and_assign_stmt, fn_arg, ident, ident_expr, obj_member_expr, str_lit_expr,
-};
+use utils::{decl_var_and_assign_stmt, obj_member_expr};
 
 const GLOBAL: &str = "global";
 const MODULE: &str = "__modules";
@@ -44,12 +41,13 @@ impl GlobalEsmModule {
     ///
     /// eg. `global.__modules.import(module_src)`
     fn get_global_import_expr(&mut self, module_src: String) -> Expr {
-        call_expr(
-            obj_member_expr(
-                obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
-                quote_ident!(MODULE_IMPORT_METHOD_NAME),
-            ),
-            vec![fn_arg(str_lit_expr(self.to_actual_path(module_src)))],
+        obj_member_expr(
+            obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+            quote_ident!(MODULE_IMPORT_METHOD_NAME),
+        )
+        .as_call(
+            DUMMY_SP,
+            vec![Str::from(self.to_actual_path(module_src)).as_arg()],
         )
     }
 
@@ -57,14 +55,15 @@ impl GlobalEsmModule {
     ///
     /// eg. `global.__modules.export(module_name, expr)`
     fn get_global_export_expr(&mut self, export_expr: Expr) -> Expr {
-        call_expr(
-            obj_member_expr(
-                obj_member_expr(ident_expr(js_word!(GLOBAL)), ident(js_word!(MODULE))),
-                quote_ident!(MODULE_EXPORT_METHOD_NAME),
-            ),
+        obj_member_expr(
+            obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+            quote_ident!(MODULE_EXPORT_METHOD_NAME),
+        )
+        .as_call(
+            DUMMY_SP,
             vec![
-                fn_arg(str_lit_expr(self.module_name.to_owned())),
-                fn_arg(export_expr),
+                Str::from(self.module_name.clone()).as_arg(),
+                export_expr.as_arg(),
             ],
         )
     }
@@ -75,28 +74,26 @@ impl GlobalEsmModule {
     /// eg. `import ident from "module_src"`
     fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
-            ModuleItem::Stmt(decl_var_and_assign_stmt(
+            decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
                 obj_member_expr(
                     self.get_global_import_expr(module_src),
                     quote_ident!("default"),
                 ),
-            ))
+            )
+            .into()
         } else {
             ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                src: Box::new(Str {
-                    span: DUMMY_SP,
-                    raw: None,
-                    value: module_src.into(),
-                }),
-                type_only: false,
-                with: None,
-                specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
+                specifiers: vec![ImportDefaultSpecifier {
                     span: DUMMY_SP,
                     local: ident.clone(),
-                })],
+                }
+                .into()],
+                src: Str::from(module_src).into(),
+                type_only: false,
+                with: None,
             }))
         }
     }
@@ -107,31 +104,30 @@ impl GlobalEsmModule {
     /// eg. `import { ident } from "module_src"`
     fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
-            ModuleItem::Stmt(decl_var_and_assign_stmt(
+            decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
                 obj_member_expr(
                     self.get_global_import_expr(module_src),
                     quote_ident!(ident.sym),
                 ),
-            ))
+            )
+            .into()
         } else {
-            ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                src: Box::new(Str {
-                    span: DUMMY_SP,
-                    raw: None,
-                    value: module_src.into(),
-                }),
-                type_only: false,
-                with: None,
-                specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                specifiers: vec![ImportNamedSpecifier {
                     span: DUMMY_SP,
                     local: ident.clone(),
                     imported: None,
                     is_type_only: false,
-                })],
-            }))
+                }
+                .into()],
+                src: Str::from(module_src).into(),
+                type_only: false,
+                with: None,
+            })
+            .into()
         }
     }
 
@@ -141,26 +137,25 @@ impl GlobalEsmModule {
     /// eg. `import * as ident from "module_src"`
     fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
-            ModuleItem::Stmt(decl_var_and_assign_stmt(
+            decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
                 self.get_global_import_expr(module_src),
-            ))
+            )
+            .into()
         } else {
-            ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                src: Box::new(Str {
-                    span: DUMMY_SP,
-                    raw: None,
-                    value: module_src.into(),
-                }),
+                src: Str::from(module_src).into(),
                 type_only: false,
                 with: None,
-                specifiers: vec![ImportSpecifier::Namespace(ImportStarAsSpecifier {
+                specifiers: vec![ImportStarAsSpecifier {
                     span: DUMMY_SP,
                     local: ident.clone(),
-                })],
-            }))
+                }
+                .into()],
+            })
+            .into()
         }
     }
 
@@ -169,10 +164,11 @@ impl GlobalEsmModule {
     /// eg. `{ default: value, named: value }` or `{}`
     fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> Expr {
         if exports.len() == 0 {
-            return Expr::Object(ObjectLit {
+            return ObjectLit {
                 span: DUMMY_SP,
                 props: Vec::new(),
-            });
+            }
+            .into();
         }
 
         let mut export_props = Vec::new();
@@ -184,35 +180,39 @@ impl GlobalEsmModule {
              }| {
                 export_props.push(match module_type {
                     ModuleType::Default | ModuleType::DefaultAsNamed => {
-                        PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                            key: PropName::Ident(Ident::new(js_word!("default"), DUMMY_SP)),
-                            value: Box::new(Expr::Ident(ident)),
-                        })))
+                        Prop::KeyValue(KeyValueProp {
+                            key: quote_ident!("default").into(),
+                            value: ident.into(),
+                        })
+                        .into()
                     }
                     ModuleType::Named => {
                         if let Some(renamed_ident) =
                             as_ident.as_ref().filter(|&id| id.sym != ident.sym)
                         {
-                            PropOrSpread::Prop(Box::new(Prop::KeyValue(KeyValueProp {
-                                key: PropName::Ident(quote_ident!(renamed_ident.sym.as_str())),
-                                value: Box::new(Expr::Ident(ident)),
-                            })))
+                            Prop::KeyValue(KeyValueProp {
+                                key: quote_ident!(renamed_ident.sym.as_str()).into(),
+                                value: ident.into(),
+                            })
+                            .into()
                         } else {
-                            PropOrSpread::Prop(Box::new(Prop::Shorthand(ident)))
+                            Prop::Shorthand(ident).into()
                         }
                     }
-                    ModuleType::NamespaceOrAll => PropOrSpread::Spread(SpreadElement {
+                    ModuleType::NamespaceOrAll => SpreadElement {
                         dot3_token: DUMMY_SP,
-                        expr: Box::new(Expr::Ident(ident)),
-                    }),
+                        expr: ident.into(),
+                    }
+                    .into(),
                 });
             },
         );
 
-        Expr::Object(ObjectLit {
+        ObjectLit {
             span: DUMMY_SP,
             props: export_props,
-        })
+        }
+        .into()
     }
 
     /// Returns an exports to global statement.
@@ -220,10 +220,7 @@ impl GlobalEsmModule {
     /// eg: `global.__modules.export(module_name, exports_obj)`
     fn get_global_exports_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
         let exports_obj = self.get_exports_obj_expr(exports);
-        Stmt::Expr(ExprStmt {
-            span: DUMMY_SP,
-            expr: Box::new(self.get_global_export_expr(exports_obj)),
-        })
+        self.get_global_export_expr(exports_obj).into_stmt()
     }
 }
 

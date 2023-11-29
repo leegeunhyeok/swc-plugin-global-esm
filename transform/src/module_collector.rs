@@ -1,9 +1,9 @@
 use crate::utils::decl_var_and_assign_stmt;
 use swc_core::{
-    common::{Mark, DUMMY_SP},
+    common::DUMMY_SP,
     ecma::{
         ast::*,
-        utils::{private_ident, quote_ident},
+        utils::private_ident,
         visit::{VisitMut, VisitMutWith},
     },
 };
@@ -115,10 +115,11 @@ impl ModuleCollector {
     ///
     /// eg. `export default ident`
     fn get_default_export_stmt(&mut self, ident: Ident) -> ModuleDecl {
-        ModuleDecl::ExportDefaultExpr(ExportDefaultExpr {
+        ExportDefaultExpr {
             span: DUMMY_SP,
-            expr: Box::new(Expr::Ident(ident)),
-        })
+            expr: ident.into(),
+        }
+        .into()
     }
 
     fn collect_default_export_decl_and_convert_to_stmt(
@@ -135,17 +136,18 @@ impl ModuleCollector {
                 self.exports.push(ExportModule::default(fn_ident.clone()));
                 Some((
                     fn_ident.clone(),
-                    Stmt::Decl(Decl::Fn(FnDecl {
+                    FnDecl {
                         ident: fn_ident.clone(),
                         function: function.clone(),
                         declare: false,
-                    })),
+                    }
+                    .into(),
                 ))
             }
             DefaultDecl::Fn(fn_expr) => {
                 debug!("default export decl fn: <anonymous>");
                 let (ident, stmt) =
-                    self.get_export_decl_stmt_with_private_ident(Expr::Fn(fn_expr.clone()));
+                    self.get_export_decl_stmt_with_private_ident(fn_expr.clone().into());
                 self.exports.push(ExportModule::default(ident.clone()));
                 Some((ident, stmt))
             }
@@ -159,17 +161,18 @@ impl ModuleCollector {
                     .push(ExportModule::default(class_ident.clone()));
                 Some((
                     class_ident.clone(),
-                    Stmt::Decl(Decl::Class(ClassDecl {
+                    ClassDecl {
                         ident: class_ident.clone(),
                         class: class.clone(),
                         declare: false,
-                    })),
+                    }
+                    .into(),
                 ))
             }
             DefaultDecl::Class(class_expr) => {
                 debug!("default export decl class: <anonymous>");
                 let (ident, stmt) =
-                    self.get_export_decl_stmt_with_private_ident(Expr::Class(class_expr.clone()));
+                    self.get_export_decl_stmt_with_private_ident(class_expr.clone().into());
                 self.exports.push(ExportModule::default(ident.clone()));
                 Some((ident, stmt))
             }
