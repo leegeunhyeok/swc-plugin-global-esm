@@ -13,6 +13,7 @@ const __export_default = class {
 };
 export default __export_default;
 export { app, useCustomHook };
+global.__modules.init("test.js");
 global.__modules.export("test.js", {
   MyComponent,
   default: __export_default,

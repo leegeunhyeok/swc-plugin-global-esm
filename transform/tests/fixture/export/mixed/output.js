@@ -19,6 +19,7 @@ const __export_default = class {
     // empty
   }
 };
+global.__modules.init("test.js");
 global.__modules.export("test.js", {
   MyComponent,
   default: __export_default,
