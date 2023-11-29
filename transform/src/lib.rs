@@ -1,6 +1,11 @@
+mod constants;
 mod module_collector;
 mod utils;
 
+use constants::{
+    GLOBAL, MODULE, MODULE_EXPORT_ALL_METHOD_NAME, MODULE_EXPORT_METHOD_NAME,
+    MODULE_IMPORT_METHOD_NAME, MODULE_INIT_METHOD_NAME, MODULE_RESET_METHOD_NAME,
+};
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use regex::Regex;
 use std::collections::{BTreeMap, HashMap};
@@ -12,14 +17,61 @@ use swc_core::{
         visit::{as_folder, noop_visit_mut_type, Fold, VisitMut, VisitMutWith},
     },
 };
-use utils::{decl_var_and_assign_stmt, obj_lit, obj_member_expr};
+use utils::{decl_var_and_assign_stmt, global_module_api_call_expr, obj_lit, obj_member_expr};
 
-const GLOBAL: &str = "global";
-const MODULE: &str = "__modules";
-const MODULE_INIT_METHOD_NAME: &str = "init";
-const MODULE_RESET_METHOD_NAME: &str = "reset";
-const MODULE_IMPORT_METHOD_NAME: &str = "import";
-const MODULE_EXPORT_METHOD_NAME: &str = "export";
+struct GlobalExports {
+    export: Option<Stmt>,
+    export_all: Option<Stmt>,
+}
+
+impl GlobalExports {
+    fn new(
+        module_name: &String,
+        export_obj_expr: Option<Expr>,
+        export_all_obj_expr: Option<Expr>,
+    ) -> Self {
+        GlobalExports {
+            export: export_obj_expr.and_then(|expr| {
+                global_module_api_call_expr(
+                    MODULE_EXPORT_METHOD_NAME,
+                    vec![Str::from(module_name.clone()).as_arg(), expr.as_arg()],
+                )
+                .into_stmt()
+                .into()
+            }),
+            export_all: export_all_obj_expr.and_then(|expr| {
+                global_module_api_call_expr(
+                    MODULE_EXPORT_ALL_METHOD_NAME,
+                    vec![Str::from(module_name.clone()).as_arg(), expr.as_arg()],
+                )
+                .into_stmt()
+                .into()
+            }),
+        }
+    }
+}
+
+struct ExportObjects {
+    export: Option<Expr>,
+    export_all: Option<Expr>,
+}
+
+impl ExportObjects {
+    fn from_props(export_props: Vec<PropOrSpread>, export_all_props: Vec<PropOrSpread>) -> Self {
+        ExportObjects {
+            export: if export_props.len() > 0 {
+                obj_lit(Some(export_props)).into()
+            } else {
+                None
+            },
+            export_all: if export_all_props.len() > 0 {
+                obj_lit(Some(export_all_props)).into()
+            } else {
+                None
+            },
+        }
+    }
+}
 
 pub struct GlobalEsmModule {
     module_name: String,
@@ -63,12 +115,8 @@ impl GlobalEsmModule {
         decl_var_and_assign_stmt(
             ident.clone(),
             ident.span,
-            obj_member_expr(
-                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
-                quote_ident!(MODULE_IMPORT_METHOD_NAME),
-            )
-            .as_call(
-                DUMMY_SP,
+            global_module_api_call_expr(
+                MODULE_IMPORT_METHOD_NAME,
                 vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
             ),
         )
@@ -81,26 +129,6 @@ impl GlobalEsmModule {
                 .normalize_regex
                 .replace_all(format!("_{module_src}").as_str(), "_")
                 .to_string()))
-    }
-
-    /// Returns an expression that export module to global.
-    ///
-    /// eg. `global.__modules.export(module_name, expr)`
-    fn get_global_export_expr(&mut self, export_expr: Expr, export_all_expr: Option<Expr>) -> Expr {
-        let mut export_args = vec![
-            Str::from(self.module_name.clone()).as_arg(),
-            export_expr.as_arg(),
-        ];
-
-        if let Some(export_all) = export_all_expr {
-            export_args.push(export_all.into());
-        }
-
-        obj_member_expr(
-            obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
-            quote_ident!(MODULE_EXPORT_METHOD_NAME),
-        )
-        .as_call(DUMMY_SP, export_args)
     }
 
     /// Returns a statement that import default value from global.
@@ -196,11 +224,7 @@ impl GlobalEsmModule {
     ///
     /// Export eg. `{ default: value, named: value }` or `{}`
     /// Export all eg. `{ ...all_export } or None`
-    fn get_exports_obj_expr(&mut self, exports: Vec<ExportModule>) -> (Expr, Option<Expr>) {
-        if exports.len() == 0 {
-            return (obj_lit(None), None);
-        }
-
+    fn get_export_objects(&mut self, exports: Vec<ExportModule>) -> ExportObjects {
         let mut export_props = Vec::new();
         let mut export_all_props: Vec<PropOrSpread> = Vec::new();
         exports.into_iter().for_each(
@@ -245,14 +269,7 @@ impl GlobalEsmModule {
             },
         );
 
-        (
-            obj_lit(Some(export_props)),
-            if export_all_props.len() > 0 {
-                Some(obj_lit(Some(export_all_props)))
-            } else {
-                None
-            },
-        )
+        ExportObjects::from_props(export_props, export_all_props)
     }
 
     fn get_init_global_export_stmt(&mut self) -> Stmt {
@@ -282,10 +299,9 @@ impl GlobalEsmModule {
     /// Returns an exports to global statement.
     ///
     /// eg: `global.__modules.export(module_name, exports_obj)`
-    fn get_global_export_stmt(&mut self, exports: Vec<ExportModule>) -> Stmt {
-        let (export_obj, export_all_obj) = self.get_exports_obj_expr(exports);
-        self.get_global_export_expr(export_obj, export_all_obj)
-            .into_stmt()
+    fn get_global_exports(&mut self, exports: Vec<ExportModule>) -> GlobalExports {
+        let ExportObjects { export, export_all } = self.get_export_objects(exports);
+        GlobalExports::new(&self.module_name, export, export_all)
     }
 }
 
@@ -331,9 +347,15 @@ impl VisitMut for GlobalEsmModule {
         // Exports
         if exports.len() > 0 {
             module.body.push(self.get_init_global_export_stmt().into());
-            module
-                .body
-                .push(self.get_global_export_stmt(exports).into());
+            let GlobalExports { export, export_all } = self.get_global_exports(exports);
+
+            if let Some(export_stmt) = export {
+                module.body.push(export_stmt.into());
+            }
+
+            if let Some(export_all_stmt) = export_all {
+                module.body.push(export_all_stmt.into());
+            }
         } else {
             module.body.push(self.get_reset_global_export_stmt().into());
         }

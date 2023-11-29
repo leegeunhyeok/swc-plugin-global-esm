@@ -18,7 +18,11 @@ export interface GlobalEsModule {
   /**
    * Export a module to global ESM context.
    */
-  export(moduleName: string, exports: ModuleExports, reExports?: ModuleExports): void;
+  export(moduleName: string, exports: ModuleExports): void;
+  /**
+   * Re-export a module to global ESM context.
+   */
+  exportAll(moduleName: string, exports: ModuleExports): void;
 }
 
 ((global, modules: Modules = {}) => {
@@ -42,7 +46,7 @@ export interface GlobalEsModule {
         throw new Error(`[Global ESM] "${moduleName}" module not found`);
       })();
     },
-    export(moduleName, exports, exportAll) {
+    export(moduleName, exports) {
       if (typeof modules[moduleName] !== 'object') {
         throw new Error(`[Global ESM] "${moduleName}" module not initialized`);
       }
@@ -59,17 +63,24 @@ export interface GlobalEsModule {
           });
         }
       });
-
-      if (typeof exportAll === 'object') {
-        Object.keys(exportAll).forEach((reExportMember) => {
-          if (reExportMember !== 'default' && Object.prototype.hasOwnProperty.call(exportAll, reExportMember)) {
-            Object.defineProperty(modules[moduleName], reExportMember, {
-              enumerable: true,
-              get: () => exportAll[reExportMember],
-            });
-          }
-        });
+    },
+    exportAll(moduleName, exports) {
+      if (typeof modules[moduleName] !== 'object') {
+        throw new Error(`[Global ESM] "${moduleName}" module not initialized`);
       }
+
+      if (typeof exports !== 'object') {
+        throw new Error(`[Global ESM] invalid exports argument on "${moduleName}" module registration`);
+      }
+
+      Object.keys(exports).forEach((exportMember) => {
+        if (exportMember !== 'default' && Object.prototype.hasOwnProperty.call(exports, exportMember)) {
+          Object.defineProperty(modules[moduleName], exportMember, {
+            enumerable: true,
+            get: () => exports[exportMember],
+          });
+        }
+      });
     },
   };
 

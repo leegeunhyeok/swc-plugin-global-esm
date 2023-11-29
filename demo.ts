@@ -23,7 +23,7 @@ export default class {}
 // re-exports
 export * from '@app/module_a';
 export * as B from '@app/module_b';
-export { c as C } from '@app/module_c'; 
+export { c as C } from '@app/module_c';
 `;
 
 ;(async () => {

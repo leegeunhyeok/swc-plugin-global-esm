@@ -123,7 +123,8 @@ global.__modules.export("demo.tsx", {
   default: __export_default,
   B: __re_export,
   C: c
-}, { ...__re_export_all });
+});
+global.__modules.exportAll("demo.tsx", { ...__re_export_all });
 ```
 
 ## Use Cases

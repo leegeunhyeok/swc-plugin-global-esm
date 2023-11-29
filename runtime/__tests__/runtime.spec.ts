@@ -180,7 +180,30 @@ describe('swc-plugin-global-esm/runtime', () => {
       });
     });
 
-    describe('when call `export()` with `exports`', () => {
+    describe('when call `exportAll()` with invalid arguments', () => {
+      beforeEach(() => {
+        global.__modules.init(modulePath);
+      });
+
+      describe('when `exports` is invalid', () => {
+        let invalidExports: any;
+
+        beforeEach(() => {
+          invalidExports = faker.helpers.arrayElement([
+            null,
+            undefined,
+            faker.number.int(),
+            faker.string.alphanumeric(),
+          ]);
+        });
+
+        it('should throw error', () => {
+          expect(() => global.__modules.exportAll(modulePath, invalidExports)).toThrow(Error);
+        });
+      });
+    });
+
+    describe('when call `export()` with valid argument', () => {
       let exportKey: string;
       let exportValue: string;
       let exports: Record<string, unknown>;
@@ -201,7 +224,7 @@ describe('swc-plugin-global-esm/runtime', () => {
       });
     });
 
-    describe('when call `export()` with `exportAll`', () => {
+    describe('when call `exportAll()` with valid argument', () => {
       let exportKey: string;
       let exportValue: string;
       let exportAll: Record<string, unknown>;
@@ -211,7 +234,7 @@ describe('swc-plugin-global-esm/runtime', () => {
         exportValue = faker.string.uuid();
         exportAll = { [exportKey]: exportValue };
         global.__modules.init(modulePath);
-        global.__modules.export(modulePath, {}, exportAll);
+        global.__modules.exportAll(modulePath, exportAll);
       });
 
       describe('when call `import()` with the exported module', () => {
@@ -226,7 +249,7 @@ describe('swc-plugin-global-esm/runtime', () => {
           exportValue = faker.string.uuid();
           exportAll = { default: exportValue };
           global.__modules.init(modulePath);
-          global.__modules.export(modulePath, {}, exportAll);
+          global.__modules.exportAll(modulePath, exportAll);
         });
 
         describe('when call `import()` with the exported module', () => {

@@ -1,7 +1,12 @@
 use swc_core::{
     common::{Span, DUMMY_SP},
-    ecma::ast::*,
+    ecma::{
+        ast::*,
+        utils::{quote_ident, ExprFactory},
+    },
 };
+
+use crate::constants::{GLOBAL, MODULE};
 
 /// Returns an object member expression.
 ///
@@ -31,10 +36,24 @@ pub fn decl_var_and_assign_stmt(name: Ident, span: Span, init: Expr) -> Stmt {
     })))
 }
 
+/// Returns an object literal expression.
+///
+/// eg. `{ props }`
 pub fn obj_lit(props: Option<Vec<PropOrSpread>>) -> Expr {
     ObjectLit {
         span: DUMMY_SP,
         props: props.unwrap_or(Vec::new()),
     }
     .into()
+}
+
+/// Returns a global module api method call expression.
+///
+/// eg. `global.__modules.{method_name}(...args)`
+pub fn global_module_api_call_expr(method_name: &str, args: Vec<ExprOrSpread>) -> Expr {
+    obj_member_expr(
+        obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+        quote_ident!(method_name),
+    )
+    .as_call(DUMMY_SP, args)
 }
