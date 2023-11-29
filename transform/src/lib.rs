@@ -16,6 +16,7 @@ use utils::{decl_var_and_assign_stmt, obj_lit, obj_member_expr};
 const GLOBAL: &str = "global";
 const MODULE: &str = "__modules";
 const MODULE_INIT_METHOD_NAME: &str = "init";
+const MODULE_RESET_METHOD_NAME: &str = "reset";
 const MODULE_IMPORT_METHOD_NAME: &str = "import";
 const MODULE_EXPORT_METHOD_NAME: &str = "export";
 
@@ -260,6 +261,18 @@ impl GlobalEsmModule {
         })
     }
 
+    fn get_reset_global_export_stmt(&mut self) -> Stmt {
+        Stmt::Expr(ExprStmt {
+            span: DUMMY_SP,
+            expr: obj_member_expr(
+                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+                quote_ident!(MODULE_RESET_METHOD_NAME),
+            )
+            .as_call(DUMMY_SP, vec![Str::from(self.module_name.clone()).as_arg()])
+            .into(),
+        })
+    }
+
     /// Returns an exports to global statement.
     ///
     /// eg: `global.__modules.export(module_name, exports_obj)`
@@ -280,7 +293,6 @@ impl VisitMut for GlobalEsmModule {
         let ModuleCollector {
             imports, exports, ..
         } = collector;
-        let is_esm = imports.len() + exports.len() > 0;
 
         // Imports
         imports.into_iter().enumerate().for_each(
@@ -311,11 +323,13 @@ impl VisitMut for GlobalEsmModule {
         );
 
         // Exports
-        if is_esm {
+        if exports.len() > 0 {
             module.body.push(self.get_init_global_export_stmt().into());
             module
                 .body
                 .push(self.get_global_export_stmt(exports).into());
+        } else {
+            module.body.push(self.get_reset_global_export_stmt().into());
         }
 
         self.import_idents
