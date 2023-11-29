@@ -1,0 +1,37 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`swc-plugin-global-esm/runtime match snapshot 1`] = `
+"const __app_components = global.__modules.import("@app/components");
+const __app_core = global.__modules.import("@app/core");
+const __app_hooks = global.__modules.import("@app/hooks");
+const __app_module_a = global.__modules.import("@app/module_a");
+const __app_module_b = global.__modules.import("@app/module_b");
+const __app_module_c = global.__modules.import("@app/module_c");
+const _react = global.__modules.import("node_modules/react/cjs/react.development.js");
+const React = _react.default;
+const useState = _react.useState;
+const Container = __app_components.Container;
+const useCustomHook = __app_hooks.useCustomHook;
+const app = __app_core;
+const __re_export_all = __app_module_a;
+const __re_export = __app_module_b;
+const c = __app_module_c.c;
+function MyComponent() {
+    const [count, setCount] = useState(0);
+    useCustomHook(app);
+    return /*#__PURE__*/ React.createElement(Container, null, count);
+}
+const __export_default = class {
+};
+global.__modules.init("demo.tsx");
+global.__modules.export("demo.tsx", {
+    MyComponent,
+    APP: app,
+    default: __export_default,
+    B: __re_export,
+    C: c
+}, {
+    ...__re_export_all
+});
+"
+`;
