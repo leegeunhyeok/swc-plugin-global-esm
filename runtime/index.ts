@@ -34,6 +34,22 @@ export interface GlobalEsModule {
     throw new Error('[Global ESM] `global` is undefined');
   }
 
+  function getModule(moduleName: string) {
+    return modules[moduleName] || (() => {
+      throw new Error(`[Global ESM] "${moduleName}" module not found`);
+    })();
+  }
+
+  function assertExports(moduleName: string, exports: unknown) {
+    if (typeof modules[moduleName] !== 'object') {
+      throw new Error(`[Global ESM] "${moduleName}" module not initialized`);
+    }
+
+    if (typeof exports !== 'object') {
+      throw new Error(`[Global ESM] invalid exports argument on "${moduleName}" module registration`);
+    }
+  }
+
   const globalEsmApi: GlobalEsModule = {
     reset(moduleName) {
       if (typeof moduleName === 'string') {
@@ -46,19 +62,15 @@ export interface GlobalEsModule {
       modules[moduleName] = Object.create(null);
     },
     import(moduleName) {
-      return modules[moduleName] || (() => {
-        throw new Error(`[Global ESM] "${moduleName}" module not found`);
-      })();
+      return getModule(moduleName);
     },
     importWildcard(moduleName) {
-      const exportedModule = modules[moduleName] || (() => {
-        throw new Error(`[Global ESM] "${moduleName}" module not found`);
-      })();
+      const module = getModule(moduleName);
       const newModule = Object.create(null);
 
-      Object.keys(exportedModule).forEach((moduleMember) => {
-        if (moduleMember !== 'default' && Object.prototype.hasOwnProperty.call(exportedModule, moduleMember)) {
-          const descriptor = Object.getOwnPropertyDescriptor(exportedModule, moduleMember);
+      Object.keys(module).forEach((moduleMember) => {
+        if (moduleMember !== 'default' && Object.prototype.hasOwnProperty.call(module, moduleMember)) {
+          const descriptor = Object.getOwnPropertyDescriptor(module, moduleMember);
           if (descriptor) {
             Object.defineProperty(
               newModule,
@@ -66,22 +78,14 @@ export interface GlobalEsModule {
               descriptor
             );
           } else {
-            newModule[moduleMember] = exportedModule[moduleMember];
+            newModule[moduleMember] = module[moduleMember];
           }
         }
       });
-
       return newModule;
     },
     export(moduleName, exports) {
-      if (typeof modules[moduleName] !== 'object') {
-        throw new Error(`[Global ESM] "${moduleName}" module not initialized`);
-      }
-
-      if (typeof exports !== 'object') {
-        throw new Error(`[Global ESM] invalid exports argument on "${moduleName}" module registration`);
-      }
-
+      assertExports(moduleName, exports);
       Object.keys(exports).forEach((exportMember) => {
         if (Object.prototype.hasOwnProperty.call(exports, exportMember)) {
           Object.defineProperty(modules[moduleName], exportMember, {
@@ -92,14 +96,7 @@ export interface GlobalEsModule {
       });
     },
     exportAll(moduleName, exports) {
-      if (typeof modules[moduleName] !== 'object') {
-        throw new Error(`[Global ESM] "${moduleName}" module not initialized`);
-      }
-
-      if (typeof exports !== 'object') {
-        throw new Error(`[Global ESM] invalid exports argument on "${moduleName}" module registration`);
-      }
-
+      assertExports(moduleName, exports);
       Object.keys(exports).forEach((exportMember) => {
         if (exportMember !== 'default' && Object.prototype.hasOwnProperty.call(exports, exportMember)) {
           Object.defineProperty(modules[moduleName], exportMember, {
