@@ -70,16 +70,23 @@ import { Container, Section, Button, Text } from '@app/components';
 import { useCustomHook } from '@app/hooks';
 import * as app from '@app/core';
 
+// named export & declaration
 export function MyComponent (): JSX.Element {
-  // ...
+  const [count, setCount] = useState(0);
+  useCustomHook(app);
+  return <Container>{count}</Container>;
 }
 
-// anonymous class
+// export with alias
+export { app as APP };
+
+// default export & anonymous declaration
 export default class {}
 
 // re-exports
 export * from '@app/module_a';
 export * as B from '@app/module_b';
+export { c as C } from '@app/module_c'; 
 ```
 
 After
@@ -91,20 +98,19 @@ const __app_core = global.__modules.import("@app/core");
 const __app_hooks = global.__modules.import("@app/hooks");
 const __app_module_a = global.__modules.import("@app/module_a");
 const __app_module_b = global.__modules.import("@app/module_b");
+const __app_module_c = global.__modules.import("@app/module_c");
 const _react = global.__modules.import("react");
+
 const React = _react.default;
 const useState = _react.useState;
-const useEffect = _react.useEffect;
 const Container = __app_components.Container;
-const Section = __app_components.Section;
-const Button = __app_components.Button;
-const Text = __app_components.Text;
 const useCustomHook = __app_hooks.useCustomHook;
 const app = __app_core;
 const __re_export_all = __app_module_a;
 const __re_export = __app_module_b;
+const c = __app_module_c.c;
 
-function MyComponent () {
+function MyComponent() {
   // ...
 }
 
@@ -113,8 +119,10 @@ const __export_default = class {};
 global.__modules.init("demo.tsx");
 global.__modules.export("demo.tsx", {
   MyComponent,
+  APP: app,
   default: __export_default,
-  B: __re_export
+  B: __re_export,
+  C: c
 }, { ...__re_export_all });
 ```
 

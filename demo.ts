@@ -2,44 +2,28 @@ import { transform } from '@swc/core';
 import highlight from 'cli-highlight';
 
 const inputCode =`
-import React, { useState, useEffect } from 'react';
-import { Container, Section, Button, Text } from '@app/components';
+import React, { useState } from 'react';
+import { Container } from '@app/components';
 import { useCustomHook } from '@app/hooks';
+import * as app from '@app/core';
 
-export { default as A } from 'a';
-export { default as B } from 'b';
-
-export interface MyComponentProps {
-  message?: string;
+// named export & declaration
+export function MyComponent (): JSX.Element {
+  const [count, setCount] = useState(0);
+  useCustomHook(app);
+  return <Container>{count}</Container>;
 }
 
-export function MyComponent({ message = 'Hello, world!' }: MyComponentProps): JSX.Element {
-  const [count, setCount] = useState(0);
+// export with alias
+export { app as APP };
 
-  useEffect(() => {
-    console.log('effect');
-  }, []);
-
-  useCustomHook();
-
-  return (
-    <Container>
-      <Section>
-        <Text>{message}</Text>
-      </Section>
-      <Section>
-        <Text>{count}</Text>
-      </Section>
-      <Section>
-        <Button onPress={() => setCount((v) => v + 1)}>
-          <Text>{'Press Me'}</Text>
-        </Button>
-      </Section>
-    </Container>
-  );
-};
-
+// default export & anonymous declaration
 export default class {}
+
+// re-exports
+export * from '@app/module_a';
+export * as B from '@app/module_b';
+export { c as C } from '@app/module_c'; 
 `;
 
 ;(async () => {
@@ -47,7 +31,7 @@ export default class {}
     isModule: true,
     filename: 'demo.tsx',
     jsc: {
-      target: 'es5',
+      target: 'esnext',
       parser: {
         syntax: 'typescript',
         tsx: true,
