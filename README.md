@@ -94,20 +94,17 @@ After
 ```js
 // with `runtimeModule: true`
 const __app_components = global.__modules.import("@app/components");
-const __app_core = global.__modules.import("@app/core");
 const __app_hooks = global.__modules.import("@app/hooks");
-const __app_module_a = global.__modules.import("@app/module_a");
-const __app_module_b = global.__modules.import("@app/module_b");
 const __app_module_c = global.__modules.import("@app/module_c");
-const _react = global.__modules.import("react");
+const _react = global.__modules.import("node_modules/react/cjs/react.development.js");
+const app = global.__modules.importWildcard("@app/core");
+const __re_export_all = global.__modules.importWildcard("@app/module_a");
+const __re_export = global.__modules.importWildcard("@app/module_b");
 
 const React = _react.default;
 const useState = _react.useState;
 const Container = __app_components.Container;
 const useCustomHook = __app_hooks.useCustomHook;
-const app = __app_core;
-const __re_export_all = __app_module_a;
-const __re_export = __app_module_b;
 const c = __app_module_c.c;
 
 function MyComponent() {

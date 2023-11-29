@@ -16,11 +16,15 @@ export interface GlobalEsModule {
    */
   import(moduleName: string): ModuleExports;
   /**
+   * Import with wildcard an exported module in global ESM context.
+   */
+  importWildcard(moduleName: string): ModuleExports;
+  /**
    * Export a module to global ESM context.
    */
   export(moduleName: string, exports: ModuleExports): void;
   /**
-   * Re-export a module to global ESM context.
+   * Export all(*) module to global ESM context.
    */
   exportAll(moduleName: string, exports: ModuleExports): void;
 }
@@ -45,6 +49,29 @@ export interface GlobalEsModule {
       return modules[moduleName] || (() => {
         throw new Error(`[Global ESM] "${moduleName}" module not found`);
       })();
+    },
+    importWildcard(moduleName) {
+      const exportedModule = modules[moduleName] || (() => {
+        throw new Error(`[Global ESM] "${moduleName}" module not found`);
+      })();
+      const newModule = Object.create(null);
+
+      Object.keys(exportedModule).forEach((moduleMember) => {
+        if (moduleMember !== 'default' && Object.prototype.hasOwnProperty.call(exportedModule, moduleMember)) {
+          const descriptor = Object.getOwnPropertyDescriptor(exportedModule, moduleMember);
+          if (descriptor) {
+            Object.defineProperty(
+              newModule,
+              moduleMember,
+              descriptor
+            );
+          } else {
+            newModule[moduleMember] = exportedModule[moduleMember];
+          }
+        }
+      });
+
+      return newModule;
     },
     export(moduleName, exports) {
       if (typeof modules[moduleName] !== 'object') {

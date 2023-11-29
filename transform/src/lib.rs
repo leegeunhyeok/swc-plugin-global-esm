@@ -4,7 +4,8 @@ mod utils;
 
 use constants::{
     GLOBAL, MODULE, MODULE_EXPORT_ALL_METHOD_NAME, MODULE_EXPORT_METHOD_NAME,
-    MODULE_IMPORT_METHOD_NAME, MODULE_INIT_METHOD_NAME, MODULE_RESET_METHOD_NAME,
+    MODULE_IMPORT_METHOD_NAME, MODULE_IMPORT_WILDCARD_METHOD_NAME, MODULE_INIT_METHOD_NAME,
+    MODULE_RESET_METHOD_NAME,
 };
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
 use regex::Regex;
@@ -192,16 +193,17 @@ impl GlobalEsmModule {
 
     /// Returns a statement that import namespaced value from global.
     ///
-    /// eg. `const ident = {module_ident}`
+    /// eg. `const ident = global.__modules.importAll(module_src)`
     /// eg. `import * as ident from "module_src"`
     fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
             decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
-                self.get_or_create_global_import_module_ident(&module_src)
-                    .clone()
-                    .into(),
+                global_module_api_call_expr(
+                    MODULE_IMPORT_WILDCARD_METHOD_NAME,
+                    vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
+                ),
             )
             .into()
         } else {

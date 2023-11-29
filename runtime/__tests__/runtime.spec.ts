@@ -203,7 +203,7 @@ describe('swc-plugin-global-esm/runtime', () => {
       });
     });
 
-    describe('when call `export()` with valid argument', () => {
+    describe('when call `export()` with valid exports object', () => {
       let exportKey: string;
       let exportValue: string;
       let exports: Record<string, unknown>;
@@ -220,6 +220,26 @@ describe('swc-plugin-global-esm/runtime', () => {
         it('should match the exported module', () => {
           const exportedModule = global.__modules.import(modulePath);
           expect(exportedModule[exportKey]).toEqual(exportValue);
+        });
+      });
+    });
+
+    describe('when call `export()` with valid exports object that has `default` property', () => {
+      let exportValue: string;
+      let exports: Record<string, unknown>;
+
+      beforeEach(() => {
+        exportValue = faker.string.uuid();
+        exports = { default: exportValue };
+        global.__modules.init(modulePath);
+        global.__modules.export(modulePath, exports);
+      });
+
+      describe('when call `importWildcard()` with the exported module', () => {
+        it('should exclude `default` property', () => {
+          const exportedModule = global.__modules.importWildcard(modulePath);
+          expect(exports.default).toEqual(exportValue);
+          expect(exportedModule.default).toBeUndefined();
         });
       });
     });

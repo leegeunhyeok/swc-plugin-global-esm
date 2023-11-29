@@ -1,5 +1,4 @@
 const __app_components = global.__modules.import("@app/components");
-const __app_core = global.__modules.import("@app/core");
 const __app_hooks = global.__modules.import("@app/hooks");
 const _react = global.__modules.import("react");
 const React = _react.default;
@@ -10,7 +9,7 @@ const Section = __app_components.Section;
 const Button = __app_components.Button;
 const Text = __app_components.Text;
 const useCustomHook = __app_hooks.useCustomHook;
-const app = __app_core;
+const app = global.__modules.importWildcard("@app/core");
 function MyComponent() {
   return null;
 }
