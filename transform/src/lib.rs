@@ -2,6 +2,7 @@ mod module_collector;
 mod utils;
 
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
+use regex::Regex;
 use std::collections::{BTreeMap, HashMap};
 use swc_core::{
     common::DUMMY_SP,
@@ -25,6 +26,7 @@ pub struct GlobalEsmModule {
     runtime_module: bool,
     import_paths: Option<HashMap<String, String>>,
     import_idents: BTreeMap<String, Ident>,
+    normalize_regex: Regex,
 }
 
 impl GlobalEsmModule {
@@ -38,6 +40,7 @@ impl GlobalEsmModule {
             runtime_module,
             import_paths,
             import_idents: BTreeMap::new(),
+            normalize_regex: Regex::new(r"[^a-zA-Z0-9]").unwrap(),
         }
     }
 
@@ -74,7 +77,10 @@ impl GlobalEsmModule {
     fn get_or_create_global_import_module_ident(&mut self, module_src: &String) -> &Ident {
         self.import_idents
             .entry(module_src.clone())
-            .or_insert(private_ident!("__module"))
+            .or_insert(private_ident!(self
+                .normalize_regex
+                .replace_all(format!("_{module_src}").as_str(), "_")
+                .to_string()))
     }
 
     /// Returns an expression that export module to global.

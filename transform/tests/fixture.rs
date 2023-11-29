@@ -6,6 +6,7 @@ use swc_global_esm::global_esm;
 
 #[testing::fixture("tests/fixture/import/**/input.js")]
 #[testing::fixture("tests/fixture/export/**/input.js")]
+#[testing::fixture("tests/fixture/normalize_src/**/input.js")]
 fn fixture(input: PathBuf) {
     let filename = input.to_string_lossy();
     let output = input.with_file_name("output.js");

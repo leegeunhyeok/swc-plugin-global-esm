@@ -1,5 +1,5 @@
-const __module = global.__modules.import("react");
-const React = __module.default;
-const useState = __module.useState;
-const useContext = __module.useContext;
+const _react = global.__modules.import("react");
+const React = _react.default;
+const useState = _react.useState;
+const useContext = _react.useContext;
 global.__modules.reset("test.js");

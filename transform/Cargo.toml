@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+regex = "1.10.2"
 serde = "1"
 swc_core = { version = "0.85.*", features = ["ecma_plugin_transform", "ecma_utils"] }
 tracing = "0.1.40"

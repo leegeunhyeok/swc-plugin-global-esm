@@ -1,7 +1,7 @@
-const __module = global.__modules.import("a");
-const __module1 = global.__modules.import("b");
-const __default = __module.default;
-const __default1 = __module1.default;
+const _a = global.__modules.import("a");
+const _b = global.__modules.import("b");
+const __default = _a.default;
+const __default1 = _b.default;
 global.__modules.init("test.js");
 global.__modules.export("test.js", {
   A: __default,

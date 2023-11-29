@@ -1,3 +1,3 @@
-const __module = global.__modules.import("react");
-const React = __module.default;
+const _react = global.__modules.import("react");
+const React = _react.default;
 global.__modules.reset("test.js");
