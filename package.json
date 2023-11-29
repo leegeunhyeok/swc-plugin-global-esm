@@ -46,6 +46,7 @@
         "cli-highlight": "^2.1.11",
         "esbuild": "^0.19.5",
         "jest": "^29.7.0",
+        "release-it": "^16.3.0",
         "typescript": "^5.2.2"
     },
     "preferUnplugged": true,
