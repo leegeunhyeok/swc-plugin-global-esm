@@ -71,22 +71,23 @@ import { useCustomHook } from '@app/hooks';
 import * as app from '@app/core';
 
 // named export & declaration
-export function MyComponent (): JSX.Element {
+export function MyComponent(): JSX.Element {
   const [count, setCount] = useState(0);
   useCustomHook(app);
   return <Container>{count}</Container>;
 }
 
-// export with alias
-export { app as APP };
+// named export with alias
+export { app as AppCore };
 
 // default export & anonymous declaration
 export default class {}
 
 // re-exports
 export * from '@app/module_a';
-export * as B from '@app/module_b';
-export { c as C } from '@app/module_c'; 
+export * from '@app/module_b';
+export * as car from '@app/module_c';
+export { driver as driverModule } from '@app/module_d';
 ```
 
 After
@@ -95,17 +96,18 @@ After
 // with `runtimeModule: true`
 const __app_components = global.__modules.import("@app/components");
 const __app_hooks = global.__modules.import("@app/hooks");
-const __app_module_c = global.__modules.import("@app/module_c");
+const __app_module_d = global.__modules.import("@app/module_d");
 const _react = global.__modules.import("node_modules/react/cjs/react.development.js");
 const app = global.__modules.importWildcard("@app/core");
 const __re_export_all = global.__modules.importWildcard("@app/module_a");
-const __re_export = global.__modules.importWildcard("@app/module_b");
+const __re_export_all1 = global.__modules.importWildcard("@app/module_b");
+const __re_export = global.__modules.importWildcard("@app/module_c");
 
 const React = _react.default;
 const useState = _react.useState;
 const Container = __app_components.Container;
 const useCustomHook = __app_hooks.useCustomHook;
-const c = __app_module_c.c;
+const driver = __app_module_d.driver;
 
 function MyComponent() {
   // ...
@@ -116,12 +118,15 @@ const __export_default = class {};
 global.__modules.init("demo.tsx");
 global.__modules.export("demo.tsx", {
   MyComponent,
-  APP: app,
+  AppCore: app,
   default: __export_default,
-  B: __re_export,
-  C: c
+  car: __re_export,
+  driverModule: driver
 });
-global.__modules.exportAll("demo.tsx", { ...__re_export_all });
+global.__modules.exportAll("demo.tsx", {
+  ...__re_export_all,
+  ...__re_export_all1
+});
 ```
 
 ## Use Cases
