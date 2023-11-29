@@ -1,6 +1,6 @@
 {
     "name": "swc-plugin-global-esm",
-    "version": "0.1.0-alpha.3",
+    "version": "0.1.0-alpha.4",
     "description": "Transform ESM to global scoped module",
     "author": "Geunhyeok LEE <dev.ghlee@gmail.com>",
     "license": "MIT",
