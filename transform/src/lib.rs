@@ -2,12 +2,12 @@ mod module_collector;
 mod utils;
 
 use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use swc_core::{
     common::DUMMY_SP,
     ecma::{
         ast::*,
-        utils::{quote_ident, ExprFactory},
+        utils::{private_ident, quote_ident, ExprFactory},
         visit::{as_folder, noop_visit_mut_type, Fold, VisitMut, VisitMutWith},
     },
 };
@@ -22,9 +22,23 @@ pub struct GlobalEsmModule {
     module_name: String,
     runtime_module: bool,
     import_paths: Option<HashMap<String, String>>,
+    import_idents: BTreeMap<String, Ident>,
 }
 
 impl GlobalEsmModule {
+    fn default(
+        module_name: String,
+        runtime_module: bool,
+        import_paths: Option<HashMap<String, String>>,
+    ) -> Self {
+        GlobalEsmModule {
+            module_name,
+            runtime_module,
+            import_paths,
+            import_idents: BTreeMap::new(),
+        }
+    }
+
     /// Find actual module path from `import_paths`
     fn to_actual_path(&mut self, module_src: String) -> String {
         if let Some(actual_path) = self
@@ -37,18 +51,28 @@ impl GlobalEsmModule {
         module_src
     }
 
-    /// Returns an expression that import module from global.
+    /// Returns an statement that import module from global and assign it.
     ///
-    /// eg. `global.__modules.import(module_src)`
-    fn get_global_import_expr(&mut self, module_src: String) -> Expr {
-        obj_member_expr(
-            obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
-            quote_ident!(MODULE_IMPORT_METHOD_NAME),
+    /// eg. `const __mod = global.__modules.import(module_src)`
+    fn get_global_import_stmt(&mut self, ident: &Ident, module_src: &String) -> Stmt {
+        decl_var_and_assign_stmt(
+            ident.clone(),
+            ident.span,
+            obj_member_expr(
+                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+                quote_ident!(MODULE_IMPORT_METHOD_NAME),
+            )
+            .as_call(
+                DUMMY_SP,
+                vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
+            ),
         )
-        .as_call(
-            DUMMY_SP,
-            vec![Str::from(self.to_actual_path(module_src)).as_arg()],
-        )
+    }
+
+    fn get_or_create_global_import_module_ident(&mut self, module_src: &String) -> &Ident {
+        self.import_idents
+            .entry(module_src.clone())
+            .or_insert(private_ident!("__module"))
     }
 
     /// Returns an expression that export module to global.
@@ -70,17 +94,15 @@ impl GlobalEsmModule {
 
     /// Returns a statement that import default value from global.
     ///
-    /// eg. `const ident = global.__modules.import("module_src").default`
+    /// eg. `const ident = {module_ident}.default`
     /// eg. `import ident from "module_src"`
     fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
+            let module_ident = self.get_or_create_global_import_module_ident(&module_src);
             decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
-                obj_member_expr(
-                    self.get_global_import_expr(module_src),
-                    quote_ident!("default"),
-                ),
+                obj_member_expr(module_ident.clone().into(), quote_ident!("default")),
             )
             .into()
         } else {
@@ -100,17 +122,15 @@ impl GlobalEsmModule {
 
     /// Returns a statement that import named value from global.
     ///
-    /// eg. `const ident = global.__modules.import("module_src").ident`
+    /// eg. `const ident = {module_ident}.ident`
     /// eg. `import { ident } from "module_src"`
     fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
+            let module_ident = self.get_or_create_global_import_module_ident(&module_src);
             decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
-                obj_member_expr(
-                    self.get_global_import_expr(module_src),
-                    quote_ident!(ident.sym),
-                ),
+                obj_member_expr(module_ident.clone().into(), quote_ident!(ident.sym)),
             )
             .into()
         } else {
@@ -133,14 +153,16 @@ impl GlobalEsmModule {
 
     /// Returns a statement that import namespaced value from global.
     ///
-    /// eg. `const ident = global.__modules.import("module_src")`
+    /// eg. `const ident = {module_ident}`
     /// eg. `import * as ident from "module_src"`
     fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
         if self.runtime_module {
             decl_var_and_assign_stmt(
                 ident.clone(),
                 ident.span,
-                self.get_global_import_expr(module_src),
+                self.get_or_create_global_import_module_ident(&module_src)
+                    .clone()
+                    .into(),
             )
             .into()
         } else {
@@ -270,6 +292,17 @@ impl VisitMut for GlobalEsmModule {
                 .body
                 .push(self.get_global_exports_stmt(exports).into());
         }
+
+        self.import_idents
+            .to_owned()
+            .into_iter()
+            .enumerate()
+            .for_each(|(index, (module_src, ident))| {
+                module.body.insert(
+                    index,
+                    self.get_global_import_stmt(&ident, &module_src).into(),
+                );
+            });
     }
 }
 
@@ -278,9 +311,9 @@ pub fn global_esm(
     runtime_module: bool,
     import_paths: Option<HashMap<String, String>>,
 ) -> impl VisitMut + Fold {
-    as_folder(GlobalEsmModule {
+    as_folder(GlobalEsmModule::default(
         module_name,
         runtime_module,
         import_paths,
-    })
+    ))
 }

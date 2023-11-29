@@ -1,12 +1,16 @@
-const React = global.__modules.import("react").default;
-const useState = global.__modules.import("react").useState;
-const useEffect = global.__modules.import("react").useEffect;
-const Container = global.__modules.import("@app/components").Container;
-const Section = global.__modules.import("@app/components").Section;
-const Button = global.__modules.import("@app/components").Button;
-const Text = global.__modules.import("@app/components").Text;
-const useCustomHook = global.__modules.import("@app/hooks").useCustomHook;
-const app = global.__modules.import("@app/core");
+const __module = global.__modules.import("@app/components");
+const __module1 = global.__modules.import("@app/core");
+const __module2 = global.__modules.import("@app/hooks");
+const __module3 = global.__modules.import("react");
+const React = __module3.default;
+const useState = __module3.useState;
+const useEffect = __module3.useEffect;
+const Container = __module.Container;
+const Section = __module.Section;
+const Button = __module.Button;
+const Text = __module.Text;
+const useCustomHook = __module2.useCustomHook;
+const app = __module1;
 function MyComponent() {
   return null;
 }

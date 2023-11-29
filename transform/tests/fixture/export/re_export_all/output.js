@@ -1,2 +1,5 @@
-const __re_export_all = global.__modules.import("module");
-global.__modules.export("test.js", { ...__re_export_all });
+const __module = global.__modules.import("module");
+const __re_export_all = __module;
+global.__modules.export("test.js", {
+  ...__re_export_all
+});
