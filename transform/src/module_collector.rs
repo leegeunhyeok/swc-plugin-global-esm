@@ -134,7 +134,7 @@ impl ModuleCollector {
             }) => {
                 debug!("default export decl fn: {:#?}", fn_ident.sym);
                 self.exports.push(ExportModule::default(fn_ident.clone()));
-                Some((
+                (
                     fn_ident.clone(),
                     FnDecl {
                         ident: fn_ident.clone(),
@@ -142,14 +142,15 @@ impl ModuleCollector {
                         declare: false,
                     }
                     .into(),
-                ))
+                )
+                    .into()
             }
             DefaultDecl::Fn(fn_expr) => {
                 debug!("default export decl fn: <anonymous>");
                 let (ident, stmt) =
                     self.get_export_decl_stmt_with_private_ident(fn_expr.clone().into());
                 self.exports.push(ExportModule::default(ident.clone()));
-                Some((ident, stmt))
+                (ident, stmt).into()
             }
             DefaultDecl::Class(ClassExpr {
                 ident: Some(class_ident),
@@ -159,7 +160,7 @@ impl ModuleCollector {
                 debug!("default export decl class: {:#?}", class_ident.sym);
                 self.exports
                     .push(ExportModule::default(class_ident.clone()));
-                Some((
+                (
                     class_ident.clone(),
                     ClassDecl {
                         ident: class_ident.clone(),
@@ -167,14 +168,15 @@ impl ModuleCollector {
                         declare: false,
                     }
                     .into(),
-                ))
+                )
+                    .into()
             }
             DefaultDecl::Class(class_expr) => {
                 debug!("default export decl class: <anonymous>");
                 let (ident, stmt) =
                     self.get_export_decl_stmt_with_private_ident(class_expr.clone().into());
                 self.exports.push(ExportModule::default(ident.clone()));
-                Some((ident, stmt))
+                (ident, stmt).into()
             }
             _ => None,
         }
@@ -202,7 +204,7 @@ impl ModuleCollector {
                     ..
                 }) => match &exported {
                     Some(ModuleExportName::Ident(as_ident)) => self.exports.push(
-                        ExportModule::named(orig_ident.clone(), Some(as_ident.clone())),
+                        ExportModule::named(orig_ident.clone(), as_ident.clone().into()),
                     ),
                     _ => self
                         .exports
@@ -237,10 +239,10 @@ impl ModuleCollector {
                         match &exported {
                             Some(ModuleExportName::Ident(as_ident)) => self
                                 .exports
-                                .push(ExportModule::named(target_ident, Some(as_ident.clone()))),
+                                .push(ExportModule::named(target_ident, as_ident.clone().into())),
                             _ => self
                                 .exports
-                                .push(ExportModule::named(target_ident, Some(orig_ident.clone()))),
+                                .push(ExportModule::named(target_ident, orig_ident.clone().into())),
                         }
                     }
                 }
@@ -409,7 +411,7 @@ impl VisitMut for ModuleCollector {
                     ));
                     self.exports.push(ExportModule::named(
                         export_ident,
-                        Some(module_ident.clone()),
+                        module_ident.clone().into(),
                     ));
                 } else {
                     // Case 2
@@ -422,11 +424,10 @@ impl VisitMut for ModuleCollector {
     fn visit_mut_export_all(&mut self, export_all: &mut ExportAll) {
         debug!("export all {:#?}", export_all);
         let export_all_ident = private_ident!("__re_export_all");
-        self.imports.push(ImportModule {
-            ident: export_all_ident.clone(),
-            module_src: export_all.src.value.to_string(),
-            module_type: ModuleType::NamespaceOrAll,
-        });
+        self.imports.push(ImportModule::namespace(
+            export_all_ident.clone(),
+            export_all.src.value.to_string(),
+        ));
         self.exports
             .push(ExportModule::all(export_all_ident.clone(), None));
     }
