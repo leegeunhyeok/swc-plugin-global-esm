@@ -27,7 +27,7 @@ struct GlobalExports {
 
 impl GlobalExports {
     fn new(
-        module_name: &String,
+        module_name: &str,
         export_obj_expr: Option<Expr>,
         export_all_obj_expr: Option<Expr>,
     ) -> Self {
@@ -35,7 +35,7 @@ impl GlobalExports {
             export: export_obj_expr.and_then(|expr| {
                 global_module_api_call_expr(
                     MODULE_EXPORT_METHOD_NAME,
-                    vec![Str::from(module_name.clone()).as_arg(), expr.as_arg()],
+                    vec![module_name.as_arg(), expr.as_arg()],
                 )
                 .into_stmt()
                 .into()
@@ -43,7 +43,7 @@ impl GlobalExports {
             export_all: export_all_obj_expr.and_then(|expr| {
                 global_module_api_call_expr(
                     MODULE_EXPORT_ALL_METHOD_NAME,
-                    vec![Str::from(module_name.clone()).as_arg(), expr.as_arg()],
+                    vec![module_name.as_arg(), expr.as_arg()],
                 )
                 .into_stmt()
                 .into()
@@ -60,12 +60,12 @@ struct ExportObjects {
 impl ExportObjects {
     fn from_props(export_props: Vec<PropOrSpread>, export_all_props: Vec<PropOrSpread>) -> Self {
         ExportObjects {
-            export: if export_props.len() > 0 {
+            export: if !export_props.is_empty() {
                 obj_lit(Some(export_props)).into()
             } else {
                 None
             },
-            export_all: if export_all_props.len() > 0 {
+            export_all: if !export_all_props.is_empty() {
                 obj_lit(Some(export_all_props)).into()
             } else {
                 None
@@ -98,7 +98,7 @@ impl GlobalEsmModule {
     }
 
     /// Find actual module path from `import_paths`
-    fn to_actual_path(&mut self, module_src: String) -> String {
+    fn to_actual_path(&self, module_src: String) -> String {
         if let Some(actual_path) = self
             .import_paths
             .as_ref()
@@ -112,13 +112,13 @@ impl GlobalEsmModule {
     /// Returns an statement that import module from global and assign it.
     ///
     /// eg. `const __mod = global.__modules.import(module_src)`
-    fn get_global_import_stmt(&mut self, ident: &Ident, module_src: &String) -> Stmt {
+    fn get_global_import_stmt(&self, ident: &Ident, module_src: &str) -> Stmt {
         decl_var_and_assign_stmt(
             ident.clone(),
             ident.span,
             global_module_api_call_expr(
                 MODULE_IMPORT_METHOD_NAME,
-                vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
+                vec![self.to_actual_path(String::from(module_src)).as_arg()],
             ),
         )
     }
@@ -278,7 +278,7 @@ impl GlobalEsmModule {
         Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
             expr: obj_member_expr(
-                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE)),
                 quote_ident!(MODULE_INIT_METHOD_NAME),
             )
             .as_call(DUMMY_SP, vec![Str::from(self.module_name.clone()).as_arg()])
@@ -290,7 +290,7 @@ impl GlobalEsmModule {
         Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
             expr: obj_member_expr(
-                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE).into()),
+                obj_member_expr(quote_ident!(GLOBAL).into(), quote_ident!(MODULE)),
                 quote_ident!(MODULE_RESET_METHOD_NAME),
             )
             .as_call(DUMMY_SP, vec![Str::from(self.module_name.clone()).as_arg()])
@@ -347,7 +347,7 @@ impl VisitMut for GlobalEsmModule {
         );
 
         // Exports
-        if exports.len() > 0 {
+        if !exports.is_empty() {
             module.body.push(self.get_init_global_export_stmt().into());
             let GlobalExports { export, export_all } = self.get_global_exports(exports);
 
@@ -363,14 +363,12 @@ impl VisitMut for GlobalEsmModule {
         }
 
         self.import_idents
-            .to_owned()
-            .into_iter()
+            .iter()
             .enumerate()
             .for_each(|(index, (module_src, ident))| {
-                module.body.insert(
-                    index,
-                    self.get_global_import_stmt(&ident, &module_src).into(),
-                );
+                module
+                    .body
+                    .insert(index, self.get_global_import_stmt(ident, module_src).into());
             });
     }
 }

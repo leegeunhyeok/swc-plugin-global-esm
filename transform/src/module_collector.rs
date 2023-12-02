@@ -192,62 +192,58 @@ impl ModuleCollector {
         (ident, stmt)
     }
 
-    fn collect_named_export_specifiers(&mut self, specifiers: &Vec<ExportSpecifier>) {
-        specifiers
-            .to_owned()
-            .into_iter()
-            .for_each(|export_spec| match export_spec {
-                ExportSpecifier::Named(ExportNamedSpecifier {
-                    orig: ModuleExportName::Ident(orig_ident),
-                    exported,
-                    is_type_only: false,
-                    ..
-                }) => match &exported {
-                    Some(ModuleExportName::Ident(as_ident)) => self.exports.push(
-                        ExportModule::named(orig_ident.clone(), as_ident.clone().into()),
-                    ),
-                    _ => self
-                        .exports
-                        .push(ExportModule::named(orig_ident.clone(), None)),
-                },
-                _ => {}
-            });
+    fn collect_named_export_specifiers(&mut self, specifiers: &[ExportSpecifier]) {
+        specifiers.iter().for_each(|export_spec| {
+            if let ExportSpecifier::Named(ExportNamedSpecifier {
+                orig: ModuleExportName::Ident(orig_ident),
+                exported,
+                is_type_only: false,
+                ..
+            }) = export_spec
+            {
+                let as_ident = exported.as_ref().map(|export_name| match export_name {
+                    ModuleExportName::Ident(as_ident) => as_ident.clone(),
+                    ModuleExportName::Str(_) => unimplemented!(),
+                });
+                self.exports
+                    .push(ExportModule::named(orig_ident.clone(), as_ident));
+            }
+        });
     }
 
-    fn collect_named_re_export_specifiers(&mut self, specifiers: &Vec<ExportSpecifier>, src: &Str) {
-        specifiers
-            .to_owned()
-            .into_iter()
-            .for_each(|import_spec| match import_spec {
-                ExportSpecifier::Named(ExportNamedSpecifier { orig, exported, .. }) => {
-                    if let ModuleExportName::Ident(orig_ident) = &orig {
-                        let is_default = orig_ident.sym == "default";
-                        let target_ident = if is_default {
-                            private_ident!("__default")
-                        } else {
-                            private_ident!(orig_ident.span, orig_ident.sym.clone())
-                        };
-                        self.imports.push(ImportModule {
-                            ident: target_ident.clone(),
-                            module_src: src.value.to_string(),
-                            module_type: if is_default {
-                                ModuleType::DefaultAsNamed
-                            } else {
-                                ModuleType::Named
-                            },
-                        });
-                        match &exported {
-                            Some(ModuleExportName::Ident(as_ident)) => self
-                                .exports
-                                .push(ExportModule::named(target_ident, as_ident.clone().into())),
-                            _ => self
-                                .exports
-                                .push(ExportModule::named(target_ident, orig_ident.clone().into())),
-                        }
-                    }
+    fn collect_named_re_export_specifiers(&mut self, specifiers: &[ExportSpecifier], src: &Str) {
+        specifiers.iter().for_each(|import_spec| {
+            if let ExportSpecifier::Named(ExportNamedSpecifier {
+                orig: ModuleExportName::Ident(orig_ident),
+                exported,
+                ..
+            }) = import_spec
+            {
+                let is_default = orig_ident.sym == "default";
+                let target_ident = if is_default {
+                    private_ident!("__default")
+                } else {
+                    private_ident!(orig_ident.span, orig_ident.sym.clone())
+                };
+                self.imports.push(ImportModule {
+                    ident: target_ident.clone(),
+                    module_src: src.value.to_string(),
+                    module_type: if is_default {
+                        ModuleType::DefaultAsNamed
+                    } else {
+                        ModuleType::Named
+                    },
+                });
+                match &exported {
+                    Some(ModuleExportName::Ident(as_ident)) => self
+                        .exports
+                        .push(ExportModule::named(target_ident, as_ident.clone().into())),
+                    _ => self
+                        .exports
+                        .push(ExportModule::named(target_ident, orig_ident.clone().into())),
                 }
-                _ => {}
-            });
+            }
+        });
     }
 }
 
@@ -331,28 +327,26 @@ impl VisitMut for ModuleCollector {
     }
 
     fn visit_mut_import_decl(&mut self, import_decl: &mut ImportDecl) {
-        import_decl
-            .specifiers
-            .to_owned()
-            .into_iter()
-            .for_each(|import_spec| {
-                let module_src = import_decl.src.value.to_string();
-                match import_spec {
-                    ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => {
-                        debug!("default import: {:#?}", local.sym);
-                        self.imports.push(ImportModule::default(local, module_src));
-                    }
-                    ImportSpecifier::Named(ImportNamedSpecifier { local, .. }) => {
-                        debug!("named import: {:#?}", local.sym);
-                        self.imports.push(ImportModule::named(local, module_src));
-                    }
-                    ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
-                        debug!("namespace import: {:#?}", local.sym);
-                        self.imports
-                            .push(ImportModule::namespace(local, module_src));
-                    }
+        import_decl.specifiers.iter().for_each(|import_spec| {
+            let module_src = import_decl.src.value.to_string();
+            match import_spec {
+                ImportSpecifier::Default(ImportDefaultSpecifier { local, .. }) => {
+                    debug!("default import: {:#?}", local.sym);
+                    self.imports
+                        .push(ImportModule::default(local.clone(), module_src));
                 }
-            });
+                ImportSpecifier::Named(ImportNamedSpecifier { local, .. }) => {
+                    debug!("named import: {:#?}", local.sym);
+                    self.imports
+                        .push(ImportModule::named(local.clone(), module_src));
+                }
+                ImportSpecifier::Namespace(ImportStarAsSpecifier { local, .. }) => {
+                    debug!("namespace import: {:#?}", local.sym);
+                    self.imports
+                        .push(ImportModule::namespace(local.clone(), module_src));
+                }
+            }
+        });
     }
 
     fn visit_mut_export_decl(&mut self, export_decl: &mut ExportDecl) {
