@@ -94,7 +94,7 @@ pub struct EsModuleCollector {
 }
 
 impl EsModuleCollector {
-    pub fn default(runtime_module: bool) -> Self {
+    pub fn new(runtime_module: bool) -> Self {
         EsModuleCollector {
             runtime_module,
             imports: Vec::new(),

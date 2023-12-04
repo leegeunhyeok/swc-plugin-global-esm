@@ -316,7 +316,7 @@ impl VisitMut for GlobalEsmModule {
     noop_visit_mut_type!();
 
     fn visit_mut_module(&mut self, module: &mut Module) {
-        let mut collector = EsModuleCollector::default(self.runtime_module);
+        let mut collector = EsModuleCollector::new(self.runtime_module);
         module.visit_mut_with(&mut collector);
 
         // ESModule
