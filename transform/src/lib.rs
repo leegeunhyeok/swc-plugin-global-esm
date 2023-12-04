@@ -1,5 +1,5 @@
 mod constants;
-mod module_collector;
+mod es_module_collector;
 mod utils;
 
 use constants::{
@@ -7,7 +7,7 @@ use constants::{
     MODULE_IMPORT_METHOD_NAME, MODULE_IMPORT_WILDCARD_METHOD_NAME, MODULE_INIT_METHOD_NAME,
     MODULE_RESET_METHOD_NAME,
 };
-use module_collector::{ExportModule, ImportModule, ModuleCollector, ModuleType};
+use es_module_collector::{EsModuleCollector, ExportModule, ImportModule, ModuleType};
 use regex::Regex;
 use std::collections::{BTreeMap, HashMap};
 use swc_core::{
@@ -316,10 +316,11 @@ impl VisitMut for GlobalEsmModule {
     noop_visit_mut_type!();
 
     fn visit_mut_module(&mut self, module: &mut Module) {
-        let mut collector = ModuleCollector::default(self.runtime_module);
+        let mut collector = EsModuleCollector::default(self.runtime_module);
         module.visit_mut_with(&mut collector);
 
-        let ModuleCollector {
+        // ESModule
+        let EsModuleCollector {
             imports, exports, ..
         } = collector;
 

@@ -87,15 +87,15 @@ impl ExportModule {
     }
 }
 
-pub struct ModuleCollector {
+pub struct EsModuleCollector {
     pub imports: Vec<ImportModule>,
     pub exports: Vec<ExportModule>,
     runtime_module: bool,
 }
 
-impl ModuleCollector {
+impl EsModuleCollector {
     pub fn default(runtime_module: bool) -> Self {
-        ModuleCollector {
+        EsModuleCollector {
             runtime_module,
             imports: Vec::new(),
             exports: Vec::new(),
@@ -431,7 +431,7 @@ impl ModuleCollector {
     }
 }
 
-impl VisitMut for ModuleCollector {
+impl VisitMut for EsModuleCollector {
     noop_visit_mut_type!();
 
     fn visit_mut_module(&mut self, module: &mut Module) {
