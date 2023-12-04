@@ -1,5 +1,5 @@
 use swc_core::{
-    common::{Span, DUMMY_SP},
+    common::DUMMY_SP,
     ecma::{
         ast::*,
         utils::{quote_ident, ExprFactory},
@@ -22,14 +22,14 @@ pub fn obj_member_expr(obj: Expr, prop: Ident) -> Expr {
 /// Returns an assign expression with declare variable statement.
 ///
 /// eg. `const name = expr`
-pub fn decl_var_and_assign_stmt(name: Ident, span: Span, init: Expr) -> Stmt {
+pub fn decl_var_and_assign_stmt(ident: &Ident, init: Expr) -> Stmt {
     Stmt::Decl(Decl::Var(Box::new(VarDecl {
         span: DUMMY_SP,
         kind: VarDeclKind::Const,
         declare: false,
         decls: vec![VarDeclarator {
-            span,
-            name: name.into(),
+            span: ident.span,
+            name: ident.clone().into(),
             init: Some(init.into()),
             definite: false,
         }],

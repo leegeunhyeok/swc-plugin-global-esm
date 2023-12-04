@@ -114,8 +114,7 @@ impl GlobalEsmModule {
     /// eg. `const __mod = global.__modules.import(module_src)`
     fn get_global_import_stmt(&self, ident: &Ident, module_src: &str) -> Stmt {
         decl_var_and_assign_stmt(
-            ident.clone(),
-            ident.span,
+            ident,
             global_module_api_call_expr(
                 MODULE_IMPORT_METHOD_NAME,
                 vec![self.to_actual_path(String::from(module_src)).as_arg()],
@@ -132,17 +131,16 @@ impl GlobalEsmModule {
                 .to_string()))
     }
 
-    /// Returns a statement that import default value from global.
+    /// Create unique module identifier and returns a statement that import default value from global.
     ///
     /// eg. `const ident = {module_ident}.default`
     /// eg. `import ident from "module_src"`
-    fn default_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+    fn create_default_import_stmt(&mut self, module_src: &String, ident: &Ident) -> ModuleItem {
         if self.runtime_module {
             let module_ident = self.get_or_create_global_import_module_ident(&module_src);
             decl_var_and_assign_stmt(
-                ident.clone(),
-                ident.span,
-                obj_member_expr(module_ident.clone().into(), quote_ident!("default")),
+                &ident,
+                obj_member_expr(module_ident.to_owned().into(), quote_ident!("default")),
             )
             .into()
         } else {
@@ -150,27 +148,29 @@ impl GlobalEsmModule {
                 span: DUMMY_SP,
                 specifiers: vec![ImportDefaultSpecifier {
                     span: DUMMY_SP,
-                    local: ident.clone(),
+                    local: ident.to_owned(),
                 }
                 .into()],
-                src: Str::from(module_src).into(),
+                src: Str::from(module_src.to_owned()).into(),
                 type_only: false,
                 with: None,
             }))
         }
     }
 
-    /// Returns a statement that import named value from global.
+    /// Create unique module identifier and returns a statement that import named value from global.
     ///
     /// eg. `const ident = {module_ident}.ident`
     /// eg. `import { ident } from "module_src"`
-    fn named_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+    fn create_named_import_stmt(&mut self, module_src: &String, ident: &Ident) -> ModuleItem {
         if self.runtime_module {
             let module_ident = self.get_or_create_global_import_module_ident(&module_src);
             decl_var_and_assign_stmt(
-                ident.clone(),
-                ident.span,
-                obj_member_expr(module_ident.clone().into(), quote_ident!(ident.sym)),
+                &ident,
+                obj_member_expr(
+                    module_ident.to_owned().into(),
+                    quote_ident!(ident.sym.to_owned()),
+                ),
             )
             .into()
         } else {
@@ -178,12 +178,12 @@ impl GlobalEsmModule {
                 span: DUMMY_SP,
                 specifiers: vec![ImportNamedSpecifier {
                     span: DUMMY_SP,
-                    local: ident.clone(),
+                    local: ident.to_owned(),
                     imported: None,
                     is_type_only: false,
                 }
                 .into()],
-                src: Str::from(module_src).into(),
+                src: Str::from(module_src.to_owned()).into(),
                 type_only: false,
                 with: None,
             })
@@ -191,30 +191,29 @@ impl GlobalEsmModule {
         }
     }
 
-    /// Returns a statement that import namespaced value from global.
+    /// Create unique module identifier and returns a statement that import namespaced value from global.
     ///
     /// eg. `const ident = global.__modules.importAll(module_src)`
     /// eg. `import * as ident from "module_src"`
-    fn namespace_import_stmt(&mut self, module_src: String, ident: Ident) -> ModuleItem {
+    fn create_namespace_import_stmt(&mut self, module_src: &String, ident: &Ident) -> ModuleItem {
         if self.runtime_module {
             decl_var_and_assign_stmt(
-                ident.clone(),
-                ident.span,
+                &ident,
                 global_module_api_call_expr(
                     MODULE_IMPORT_WILDCARD_METHOD_NAME,
-                    vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
+                    vec![Str::from(self.to_actual_path(module_src.to_owned())).as_arg()],
                 ),
             )
             .into()
         } else {
             ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                src: Str::from(module_src).into(),
+                src: Str::from(module_src.to_owned()).into(),
                 type_only: false,
                 with: None,
                 specifiers: vec![ImportStarAsSpecifier {
                     span: DUMMY_SP,
-                    local: ident.clone(),
+                    local: ident.to_owned(),
                 }
                 .into()],
             })
@@ -274,6 +273,9 @@ impl GlobalEsmModule {
         ExportObjects::from_props(export_props, export_all_props)
     }
 
+    /// Returns a statement that initialize the global module.
+    ///
+    /// eg. `global.__modules.init(module_name)`
     fn get_init_global_export_stmt(&mut self) -> Stmt {
         Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
@@ -286,6 +288,9 @@ impl GlobalEsmModule {
         })
     }
 
+    /// Returns a statement that reset the global module.
+    ///
+    /// eg. `global.__modules.reset(module_name)`
     fn get_reset_global_export_stmt(&mut self) -> Stmt {
         Stmt::Expr(ExprStmt {
             span: DUMMY_SP,
@@ -319,32 +324,40 @@ impl VisitMut for GlobalEsmModule {
         } = collector;
 
         // Imports
-        imports.into_iter().enumerate().for_each(
-            |(
-                index,
-                ImportModule {
-                    ident,
-                    module_src,
-                    module_type,
-                },
-            )| match module_type {
-                ModuleType::Default | ModuleType::DefaultAsNamed => {
-                    module
-                        .body
-                        .insert(index, self.default_import_stmt(module_src, ident));
-                }
-                ModuleType::Named => {
-                    module
-                        .body
-                        .insert(index, self.named_import_stmt(module_src, ident));
-                }
-                ModuleType::NamespaceOrAll => {
-                    module
-                        .body
-                        .insert(index, self.namespace_import_stmt(module_src, ident));
-                }
-            },
-        );
+        if !imports.is_empty() {
+            module.body.splice(
+                ..0,
+                imports
+                    .iter()
+                    .map(
+                        |ImportModule {
+                             ident,
+                             module_src,
+                             module_type,
+                         }| match module_type {
+                            ModuleType::Default | ModuleType::DefaultAsNamed => {
+                                self.create_default_import_stmt(module_src, ident)
+                            }
+                            ModuleType::Named => self.create_named_import_stmt(module_src, ident),
+                            ModuleType::NamespaceOrAll => {
+                                self.create_namespace_import_stmt(module_src, ident)
+                            }
+                        },
+                    )
+                    .collect::<Vec<_>>(),
+            );
+
+            module.body.splice(
+                ..0,
+                self.import_idents
+                    .iter()
+                    .map(|import_ident| {
+                        self.get_global_import_stmt(import_ident.1, import_ident.0)
+                            .into()
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        }
 
         // Exports
         if !exports.is_empty() {
@@ -361,15 +374,6 @@ impl VisitMut for GlobalEsmModule {
         } else {
             module.body.push(self.get_reset_global_export_stmt().into());
         }
-
-        self.import_idents
-            .iter()
-            .enumerate()
-            .for_each(|(index, (module_src, ident))| {
-                module
-                    .body
-                    .insert(index, self.get_global_import_stmt(ident, module_src).into());
-            });
     }
 }
 
