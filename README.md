@@ -3,7 +3,7 @@
 > [!WARNING]
 > This plugin is for custom module system to implement Hot Module Replacement(HMR) in some bundlers that don't support it.
 
-## Installationeac
+## Installation
 
 ```bash
 npm install swc-plugin-global-esm
