@@ -57,3 +57,15 @@ pub fn global_module_api_call_expr(method_name: &str, args: Vec<ExprOrSpread>) -
     )
     .as_call(DUMMY_SP, args)
 }
+
+/// Check `ModuleDecl` is invalid.
+pub fn is_invalid_module_decl(module_decl: &ModuleDecl) -> bool {
+    if let ModuleDecl::Import(ImportDecl {
+        src, specifiers, ..
+    }) = module_decl
+    {
+        src.is_empty() && specifiers.is_empty()
+    } else {
+        false
+    }
+}

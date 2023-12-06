@@ -1,5 +1,5 @@
 mod constants;
-mod es_module_collector;
+mod module_collector_esm;
 mod utils;
 
 use constants::{
@@ -7,7 +7,7 @@ use constants::{
     MODULE_IMPORT_METHOD_NAME, MODULE_IMPORT_WILDCARD_METHOD_NAME, MODULE_INIT_METHOD_NAME,
     MODULE_RESET_METHOD_NAME,
 };
-use es_module_collector::{EsModuleCollector, ExportModule, ImportModule, ModuleType};
+use module_collector_esm::{EsModuleCollector, ExportModule, ImportModule, ModuleType};
 use regex::Regex;
 use std::collections::{BTreeMap, HashMap};
 use swc_core::{
@@ -19,60 +19,6 @@ use swc_core::{
     },
 };
 use utils::{decl_var_and_assign_stmt, global_module_api_call_expr, obj_lit, obj_member_expr};
-
-struct GlobalExports {
-    export: Option<Stmt>,
-    export_all: Option<Stmt>,
-}
-
-impl GlobalExports {
-    fn new(
-        module_name: &str,
-        export_obj_expr: Option<Expr>,
-        export_all_obj_expr: Option<Expr>,
-    ) -> Self {
-        GlobalExports {
-            export: export_obj_expr.and_then(|expr| {
-                global_module_api_call_expr(
-                    MODULE_EXPORT_METHOD_NAME,
-                    vec![module_name.as_arg(), expr.as_arg()],
-                )
-                .into_stmt()
-                .into()
-            }),
-            export_all: export_all_obj_expr.and_then(|expr| {
-                global_module_api_call_expr(
-                    MODULE_EXPORT_ALL_METHOD_NAME,
-                    vec![module_name.as_arg(), expr.as_arg()],
-                )
-                .into_stmt()
-                .into()
-            }),
-        }
-    }
-}
-
-struct ExportObjects {
-    export: Option<Expr>,
-    export_all: Option<Expr>,
-}
-
-impl ExportObjects {
-    fn from_props(export_props: Vec<PropOrSpread>, export_all_props: Vec<PropOrSpread>) -> Self {
-        ExportObjects {
-            export: if !export_props.is_empty() {
-                obj_lit(Some(export_props)).into()
-            } else {
-                None
-            },
-            export_all: if !export_all_props.is_empty() {
-                obj_lit(Some(export_all_props)).into()
-            } else {
-                None
-            },
-        }
-    }
-}
 
 pub struct GlobalEsmModule {
     module_name: String,
@@ -122,7 +68,8 @@ impl GlobalEsmModule {
         )
     }
 
-    fn get_or_create_global_import_module_ident(&mut self, module_src: &String) -> &Ident {
+    /// Returns a cached module ident.
+    fn get_module_ident(&mut self, module_src: &String) -> &Ident {
         self.import_idents
             .entry(module_src.clone())
             .or_insert(private_ident!(self
@@ -137,10 +84,10 @@ impl GlobalEsmModule {
     /// eg. `import ident from "module_src"`
     fn create_default_import_stmt(&mut self, module_src: &String, ident: &Ident) -> ModuleItem {
         if self.runtime_module {
-            let module_ident = self.get_or_create_global_import_module_ident(&module_src);
+            let module_ident = self.get_module_ident(&module_src);
             decl_var_and_assign_stmt(
                 &ident,
-                obj_member_expr(module_ident.to_owned().into(), quote_ident!("default")),
+                obj_member_expr(module_ident.clone().into(), quote_ident!("default")),
             )
             .into()
         } else {
@@ -148,10 +95,10 @@ impl GlobalEsmModule {
                 span: DUMMY_SP,
                 specifiers: vec![ImportDefaultSpecifier {
                     span: DUMMY_SP,
-                    local: ident.to_owned(),
+                    local: ident.clone(),
                 }
                 .into()],
-                src: Str::from(module_src.to_owned()).into(),
+                src: Str::from(module_src.clone()).into(),
                 type_only: false,
                 with: None,
             }))
@@ -162,14 +109,19 @@ impl GlobalEsmModule {
     ///
     /// eg. `const ident = {module_ident}.ident`
     /// eg. `import { ident } from "module_src"`
-    fn create_named_import_stmt(&mut self, module_src: &String, ident: &Ident) -> ModuleItem {
+    fn create_named_import_stmt(
+        &mut self,
+        module_src: &String,
+        ident: &Ident,
+        imported: &Option<Ident>,
+    ) -> ModuleItem {
         if self.runtime_module {
-            let module_ident = self.get_or_create_global_import_module_ident(&module_src);
+            let module_ident = self.get_module_ident(&module_src);
             decl_var_and_assign_stmt(
                 &ident,
                 obj_member_expr(
-                    module_ident.to_owned().into(),
-                    quote_ident!(ident.sym.to_owned()),
+                    module_ident.clone().into(),
+                    quote_ident!(imported.clone().unwrap_or(ident.clone()).sym),
                 ),
             )
             .into()
@@ -178,12 +130,14 @@ impl GlobalEsmModule {
                 span: DUMMY_SP,
                 specifiers: vec![ImportNamedSpecifier {
                     span: DUMMY_SP,
-                    local: ident.to_owned(),
-                    imported: None,
+                    local: ident.clone(),
+                    imported: imported.clone().and_then(|imported_ident| {
+                        Some(ModuleExportName::Ident(imported_ident.into()))
+                    }),
                     is_type_only: false,
                 }
                 .into()],
-                src: Str::from(module_src.to_owned()).into(),
+                src: Str::from(module_src.clone()).into(),
                 type_only: false,
                 with: None,
             })
@@ -201,76 +155,24 @@ impl GlobalEsmModule {
                 &ident,
                 global_module_api_call_expr(
                     MODULE_IMPORT_WILDCARD_METHOD_NAME,
-                    vec![Str::from(self.to_actual_path(module_src.to_owned())).as_arg()],
+                    vec![Str::from(self.to_actual_path(module_src.clone())).as_arg()],
                 ),
             )
             .into()
         } else {
             ModuleDecl::Import(ImportDecl {
                 span: DUMMY_SP,
-                src: Str::from(module_src.to_owned()).into(),
+                src: Str::from(module_src.clone()).into(),
                 type_only: false,
                 with: None,
                 specifiers: vec![ImportStarAsSpecifier {
                     span: DUMMY_SP,
-                    local: ident.to_owned(),
+                    local: ident.clone(),
                 }
                 .into()],
             })
             .into()
         }
-    }
-
-    /// Returns export and export all object literal expression.
-    ///
-    /// Export eg. `{ default: value, named: value }` or `{}`
-    /// Export all eg. `{ ...all_export } or None`
-    fn get_export_objects(&mut self, exports: Vec<ExportModule>) -> ExportObjects {
-        let mut export_props = Vec::new();
-        let mut export_all_props: Vec<PropOrSpread> = Vec::new();
-        exports.into_iter().for_each(
-            |ExportModule {
-                 ident,
-                 as_ident,
-                 module_type,
-             }| {
-                match module_type {
-                    ModuleType::Default | ModuleType::DefaultAsNamed => {
-                        export_props.push(
-                            Prop::KeyValue(KeyValueProp {
-                                key: quote_ident!("default").into(),
-                                value: ident.into(),
-                            })
-                            .into(),
-                        );
-                    }
-                    ModuleType::Named => {
-                        export_props.push(
-                            if let Some(renamed_ident) =
-                                as_ident.as_ref().filter(|&id| id.sym != ident.sym)
-                            {
-                                Prop::KeyValue(KeyValueProp {
-                                    key: quote_ident!(renamed_ident.sym.as_str()).into(),
-                                    value: ident.into(),
-                                })
-                                .into()
-                            } else {
-                                Prop::Shorthand(ident).into()
-                            },
-                        );
-                    }
-                    ModuleType::NamespaceOrAll => export_all_props.push(
-                        SpreadElement {
-                            dot3_token: DUMMY_SP,
-                            expr: ident.into(),
-                        }
-                        .into(),
-                    ),
-                }
-            },
-        );
-
-        ExportObjects::from_props(export_props, export_all_props)
     }
 
     /// Returns a statement that initialize the global module.
@@ -303,12 +205,122 @@ impl GlobalEsmModule {
         })
     }
 
-    /// Returns an exports to global statement.
-    ///
-    /// eg: `global.__modules.export(module_name, exports_obj)`
-    fn get_global_exports(&mut self, exports: Vec<ExportModule>) -> GlobalExports {
-        let ExportObjects { export, export_all } = self.get_export_objects(exports);
-        GlobalExports::new(&self.module_name, export, export_all)
+    fn convert_esm_import(&mut self, imports: &Vec<ImportModule>) -> Vec<ModuleItem> {
+        let mut stmts = Vec::with_capacity(imports.len());
+
+        imports.iter().for_each(
+            |ImportModule {
+                 ident,
+                 imported,
+                 module_src,
+                 module_type,
+             }| match module_type {
+                ModuleType::Default | ModuleType::DefaultAsNamed => {
+                    stmts.push(self.create_default_import_stmt(module_src, ident).into());
+                }
+                ModuleType::Named => stmts.push(
+                    self.create_named_import_stmt(module_src, ident, imported)
+                        .into(),
+                ),
+                ModuleType::NamespaceOrAll => {
+                    stmts.push(self.create_namespace_import_stmt(module_src, ident).into())
+                }
+            },
+        );
+
+        if self.runtime_module {
+            let mut import_ident_stmts = self
+                .import_idents
+                .iter()
+                .map(|(src, ident)| self.get_global_import_stmt(ident, src).into())
+                .collect::<Vec<ModuleItem>>();
+
+            import_ident_stmts.extend(stmts);
+            import_ident_stmts
+        } else {
+            stmts
+        }
+    }
+
+    fn convert_esm_export(&mut self, exports: &Vec<ExportModule>) -> Vec<ModuleItem> {
+        let mut stmts = Vec::with_capacity(exports.len());
+        if exports.is_empty() {
+            stmts.push(self.get_reset_global_export_stmt().into());
+        } else {
+            let mut export_props = Vec::new();
+            let mut export_all_props = Vec::new();
+            exports.into_iter().for_each(
+                |ExportModule {
+                     ident,
+                     as_ident,
+                     module_type,
+                 }| {
+                    match module_type {
+                        ModuleType::Default | ModuleType::DefaultAsNamed => {
+                            export_props.push(
+                                Prop::KeyValue(KeyValueProp {
+                                    key: quote_ident!("default").into(),
+                                    value: ident.clone().into(),
+                                })
+                                .into(),
+                            );
+                        }
+                        ModuleType::Named => {
+                            export_props.push(
+                                if let Some(renamed_ident) =
+                                    as_ident.as_ref().filter(|&id| id.sym != ident.sym)
+                                {
+                                    Prop::KeyValue(KeyValueProp {
+                                        key: quote_ident!(renamed_ident.sym.as_str()).into(),
+                                        value: ident.clone().into(),
+                                    })
+                                    .into()
+                                } else {
+                                    Prop::Shorthand(ident.clone()).into()
+                                },
+                            );
+                        }
+                        ModuleType::NamespaceOrAll => export_all_props.push(
+                            SpreadElement {
+                                dot3_token: DUMMY_SP,
+                                expr: ident.clone().into(),
+                            }
+                            .into(),
+                        ),
+                    }
+                },
+            );
+            stmts.push(self.get_init_global_export_stmt().into());
+
+            if !export_props.is_empty() {
+                stmts.push(
+                    global_module_api_call_expr(
+                        MODULE_EXPORT_METHOD_NAME,
+                        vec![
+                            self.module_name.as_str().as_arg(),
+                            obj_lit(Some(export_props)).as_arg(),
+                        ],
+                    )
+                    .into_stmt()
+                    .into(),
+                );
+            }
+
+            if !export_all_props.is_empty() {
+                stmts.push(
+                    global_module_api_call_expr(
+                        MODULE_EXPORT_ALL_METHOD_NAME,
+                        vec![
+                            self.module_name.as_str().as_arg(),
+                            obj_lit(Some(export_all_props)).as_arg(),
+                        ],
+                    )
+                    .into_stmt()
+                    .into(),
+                );
+            }
+        }
+        stmts
     }
 }
 
@@ -316,65 +328,16 @@ impl VisitMut for GlobalEsmModule {
     noop_visit_mut_type!();
 
     fn visit_mut_module(&mut self, module: &mut Module) {
-        let mut collector = EsModuleCollector::new(self.runtime_module);
-        module.visit_mut_with(&mut collector);
+        let mut esm_collector = EsModuleCollector::new(self.runtime_module);
+        module.visit_mut_with(&mut esm_collector);
 
-        // ESModule
-        let EsModuleCollector {
-            imports, exports, ..
-        } = collector;
+        module
+            .body
+            .splice(..0, self.convert_esm_import(&esm_collector.imports));
 
-        // Imports
-        if !imports.is_empty() {
-            module.body.splice(
-                ..0,
-                imports
-                    .iter()
-                    .map(
-                        |ImportModule {
-                             ident,
-                             module_src,
-                             module_type,
-                         }| match module_type {
-                            ModuleType::Default | ModuleType::DefaultAsNamed => {
-                                self.create_default_import_stmt(module_src, ident)
-                            }
-                            ModuleType::Named => self.create_named_import_stmt(module_src, ident),
-                            ModuleType::NamespaceOrAll => {
-                                self.create_namespace_import_stmt(module_src, ident)
-                            }
-                        },
-                    )
-                    .collect::<Vec<_>>(),
-            );
-
-            module.body.splice(
-                ..0,
-                self.import_idents
-                    .iter()
-                    .map(|import_ident| {
-                        self.get_global_import_stmt(import_ident.1, import_ident.0)
-                            .into()
-                    })
-                    .collect::<Vec<_>>(),
-            );
-        }
-
-        // Exports
-        if !exports.is_empty() {
-            module.body.push(self.get_init_global_export_stmt().into());
-            let GlobalExports { export, export_all } = self.get_global_exports(exports);
-
-            if let Some(export_stmt) = export {
-                module.body.push(export_stmt.into());
-            }
-
-            if let Some(export_all_stmt) = export_all {
-                module.body.push(export_all_stmt.into());
-            }
-        } else {
-            module.body.push(self.get_reset_global_export_stmt().into());
-        }
+        module
+            .body
+            .extend(self.convert_esm_export(&esm_collector.exports));
     }
 }
 

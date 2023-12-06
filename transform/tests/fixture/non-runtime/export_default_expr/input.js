@@ -1,1 +1,1 @@
-export * as rename from 'module';
+export default 0;

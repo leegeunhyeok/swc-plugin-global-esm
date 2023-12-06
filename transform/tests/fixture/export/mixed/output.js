@@ -13,15 +13,15 @@ const app = global.__modules.importWildcard("@app/core");
 function MyComponent() {
   return null;
 }
-const __export_default = class {
+class __Class {
   init() {
     // empty
   }
-};
+}
 global.__modules.init("test.js");
 global.__modules.export("test.js", {
   MyComponent,
-  default: __export_default,
+  default: __Class,
   app,
   useCustomHook
 });
